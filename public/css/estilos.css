@@ -1,0 +1,305 @@
+/* DECISIONES DE ESTE COMMIT (borrar y reescribir con sus palabras): */
+/* Por qué así: los colores de Figma (#0B3954, #006B78, #3F6B22...) se guardan una sola vez como variables en :root y todo el sistema las usa con var(); cambiar un color se hace en un solo lugar. */
+/* Por qué no estilos dentro de cada HTML: habría que repetir y mantener lo mismo en seis páginas. */
+/* =====================================================================
+   SEHIP - Hoja de estilos
+   Paleta, tipografía e iconografía de la guía visual (Figma):
+   Montserrat 600/700 para títulos, Inter 400/500 para texto y datos,
+   iconos de trazo lineal de 1.5 a 2 px.
+   ===================================================================== */
+
+/* Variables de color y medidas. Se definen una vez en :root y se usan con var(--nombre); cambiar un
+   color aquí lo cambia en todo el sistema. */
+:root {
+  --fondo: #F4F7F8;          /* Fondo principal */
+  --primario: #0B3954;       /* Texto y elementos primarios */
+  --verde: #3F6B22;          /* Indicadores ambientales y estados positivos */
+  --agua: #006B78;           /* Elementos secundarios y datos */
+  --celeste: #D9F0F5;        /* Acento visual */
+  --blanco: #FFFFFF;
+
+  /* Tonos de apoyo: texto secundario, bordes y fondos de los avisos de éxito y error. */
+  --texto-suave: #4A6272;
+  --borde: #DCE5E8;
+  --borde-campo: #A9BCC5;
+  --verde-claro: #E8F1E1;
+  --rojo: #B3261E;
+  --rojo-borde: #D93A3A;
+  --rojo-claro: #FDECEC;
+
+  /* Esquinas redondeadas y sombra de las tarjetas. */
+  --radio: 12px;
+  --sombra: 0 1px 2px rgba(11, 57, 84, 0.06), 0 4px 12px rgba(11, 57, 84, 0.05);
+}
+
+/* El ancho de cada elemento incluye su relleno y borde; así las medidas son predecibles. */
+* { box-sizing: border-box; }
+
+/* Fondo, color y tipografía base de todas las páginas. */
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--primario);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Títulos en Montserrat, como en el diseño de Figma. */
+h1, h2, h3 {
+  font-family: 'Montserrat', sans-serif;
+  margin: 0;
+  line-height: 1.25;
+}
+h1 { font-size: 30px; font-weight: 700; }
+h2 { font-size: 18px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+
+/* Iconos SVG de trazo: toman el color del texto (currentColor) para combinar con cualquier botón. */
+.icono {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Encabezado ---------- */
+/* Barra superior con el logotipo y las acciones de la cuenta. */
+.encabezado {
+  background: var(--blanco);
+  border-bottom: 1px solid var(--borde);
+}
+.encabezado-contenido {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.marca { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--primario);
+  color: var(--blanco);
+  display: grid;
+  place-items: center;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+}
+.marca-nombre { font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 15px; }
+.marca-descripcion { font-size: 12px; color: var(--texto-suave); }
+
+.usuario { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+.usuario-nombre { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+
+/* ---------- Contenedor general ---------- */
+/* Limita el ancho del contenido y lo centra en pantallas grandes. */
+.contenedor {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+.titulo-pagina { margin-bottom: 28px; }
+.titulo-pagina p { margin: 6px 0 0; color: var(--texto-suave); max-width: 640px; }
+
+.distribucion {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.columna { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+
+/* ---------- Tarjetas ---------- */
+/* Caja blanca con sombra que agrupa cada formulario o resultado. */
+.tarjeta {
+  background: var(--blanco);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  padding: 24px;
+}
+.tarjeta-encabezado {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.tarjeta-titulo { display: flex; align-items: center; gap: 10px; }
+.tarjeta-titulo .icono { color: var(--agua); }
+.numero-paso {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--agua);
+  margin-bottom: 4px;
+}
+.formula {
+  font-size: 13px;
+  color: var(--texto-suave);
+  margin: -8px 0 16px;
+}
+.formula code {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  color: var(--agua);
+}
+
+/* ---------- Formularios ---------- */
+/* Campos, etiquetas y textos de ayuda; el borde cambia de color al enfocar para indicar dónde se escribe. */
+.formulario { display: flex; flex-direction: column; gap: 14px; }
+.fila-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.campo { display: flex; flex-direction: column; gap: 6px; }
+.campo label { font-size: 13px; font-weight: 500; }
+.campo input,
+.campo select {
+  font: inherit;
+  color: var(--primario);
+  background: var(--blanco);
+  border: 1px solid var(--borde-campo);
+  border-radius: 8px;
+  padding: 10px 12px;
+  width: 100%;
+}
+.campo input:focus,
+.campo select:focus {
+  outline: 2px solid var(--agua);
+  outline-offset: 1px;
+  border-color: var(--agua);
+}
+.ayuda { font-size: 12px; color: var(--texto-suave); }
+
+/* ---------- Botones ---------- */
+/* Variantes: principal (relleno), contorno, peligro (rojo) y tamaños chico y ancho. */
+.boton {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 10px 18px;
+  cursor: pointer;
+  border: 1.5px solid var(--primario);
+  background: var(--primario);
+  color: var(--blanco);
+  transition: background 0.15s, color 0.15s;
+}
+.boton:hover { background: #072a3f; }
+.boton:disabled { opacity: 0.6; cursor: wait; }
+.boton-contorno {
+  background: var(--blanco);
+  color: var(--agua);
+  border-color: var(--agua);
+}
+.boton-contorno:hover { background: var(--celeste); }
+.boton-texto {
+  background: none;
+  border: none;
+  color: var(--agua);
+  padding: 6px 8px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.boton-texto:hover { background: none; color: var(--primario); }
+.boton-texto:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
+.boton-ancho { width: 100%; }
+.acciones { display: flex; justify-content: flex-start; }
+
+/* ---------- Mensajes y alertas (guía de mensajes) ---------- */
+/* Avisos de error, éxito e información con su icono y color, para que el tipo de mensaje se reconozca
+   de inmediato. */
+.alerta {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  border: 1.5px solid;
+  margin-top: 14px;
+}
+.alerta .icono { margin-top: 1px; }
+.alerta-info { background: var(--celeste); border-color: var(--agua); color: var(--primario); }
+.alerta-info .icono { color: var(--agua); }
+.alerta-exito { background: var(--verde-claro); border-color: var(--verde); color: #2C4D17; }
+.alerta-exito .icono { color: var(--verde); }
+.alerta-error { background: var(--rojo-claro); border-color: var(--rojo-borde); color: var(--rojo); }
+.alerta-error .icono { color: var(--rojo); }
+.oculto { display: none !important; }
+
+.snackbar {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 24px;
+  width: fit-content;
+  margin: 0 auto;
+  background: var(--primario);
+  color: var(--blanco);
+  border-radius: 8px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(11, 57, 84, 0.3);
+  z-index: 10;
+}
+
+/* ---------- Chips de estado ---------- */
+/* Etiquetas pequeñas como 'Calculado' o 'En proceso'. */
+.chip {
+  display: inline-block;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.chip-proceso { background: var(--celeste); color: var(--agua); }
+.chip-calculado { background: var(--verde); color: var(--blanco); }
+.chip-excede { background: var(--rojo-claro); color: var(--rojo); }
+
+/* ---------- Historial ---------- */
+/* Lista de proyectos con su botón para abrirlos y la paginación. */
+.lista-proyectos { list-style: none; margin: 0; padding: 0; }
+.lista-proyectos li + li { border-top: 1px solid var(--borde); }
+.item-proyecto {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 12px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+}
+.item-proyecto:hover { background: var(--fondo); }
+.item-proyecto.activo { background: var(--celeste); }
+.item-nombre { font-weight: 500; overflow-wrap: anywhere; }
+.item-detalle { font-size: 12px; color: var(--texto-suave); grid-column: 1; }
+.item-proyecto .chip { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+.fila-proyecto { display: flex; align-items: center; gap: 4px; }
+.fila-proyecto .item-proyecto { flex: 1; min-width: 0; }
+/* Proyecto compartido por otro ingeniero */
+.item-compartido { font-size: 12px; color: var(--agua); grid-column: 1; }
