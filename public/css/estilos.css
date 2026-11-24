@@ -1143,3 +1143,9 @@ a.boton { text-decoration: none; }
 @media (max-width: 720px) {
   .usuario .texto-boton { display: none; }
 }
+
+/* Quita el rectángulo de foco que el navegador dibuja al hacer clic en una alcaldía;
+   la alcaldía seleccionada se marca con su propio contorno (admin-panel.js). */
+.leaflet-interactive:focus {
+  outline: none;
+}

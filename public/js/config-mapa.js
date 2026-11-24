@@ -12,17 +12,17 @@
 const PROVEEDORES_MAPA = [
   {
     nombre: 'Calles (Esri)',
-    url: '[https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x](https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x)}',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
     opciones: { attribution: 'Tiles &copy; Esri', maxZoom: 18 }
   },
   {
     nombre: 'OpenStreetMap',
-    url: '[https://tile.openstreetmap.org/{z}/{x}/{y}.png](https://tile.openstreetmap.org/{z}/{x}/{y}.png)',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     opciones: { attribution: '&copy; OpenStreetMap', maxZoom: 18 }
   },
   {
     nombre: 'Satélite (Esri)',
-    url: '[https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x](https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x)}',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     opciones: { attribution: 'Tiles &copy; Esri', maxZoom: 18 }
   }
 ];
