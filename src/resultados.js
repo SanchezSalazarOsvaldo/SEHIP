@@ -1,4 +1,4 @@
-// Calcula los resultados hidrologicos del proyecto.
+// Calcula los datos hidrológicos mostrados.
 const db = require('./db');
 const calc = require('../public/js/validaciones');
 
@@ -18,14 +18,14 @@ const CONSULTA_SIMULACION = `
     JOIN tipo_obra t ON t.id_tipo_obra = s.id_tipo_obra`;
 
 
-// Realiza una tarea importante de este modulo.
+// Define quién puede consultar un proyecto.
 function condicionAcceso(n) {
   return `(p.id_usuario = $${n} OR EXISTS (
     SELECT 1 FROM proyecto_ingeniero m WHERE m.id_proyecto = p.id_proyecto AND m.id_usuario = $${n}))`;
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Lee los coeficientes Cp y Ci.
 async function coeficientesNormativos() {
   const { rows: filas } = await db.query('SELECT tipo, valor FROM coeficiente_normativo');
   const coeficientes = { Cp: null, Ci: null };
@@ -35,7 +35,7 @@ async function coeficientesNormativos() {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Agrega superficies y caudal al proyecto.
 function completarProyecto(fila, { Cp, Ci }) {
   const conSuperficies = fila.superficie_permeable != null && fila.superficie_impermeable != null;
   fila.superficie_total = conSuperficies
@@ -56,7 +56,7 @@ function completarProyecto(fila, { Cp, Ci }) {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Calcula los resultados de una obra.
 function completarSimulacion(fila, proyecto, Cp) {
   fila.distancia_m = calc.redondear(
     calc.distanciaMetros(proyecto.latitud, proyecto.longitud, fila.latitud, fila.longitud), 2);
