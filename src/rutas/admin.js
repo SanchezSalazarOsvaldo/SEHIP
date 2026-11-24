@@ -1,4 +1,4 @@
-// Controla las cuentas y opciones del administrador.
+// Gestiona cuentas y datos del administrador.
 const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -27,7 +27,7 @@ const ERROR_TRIGGER = 'P0001';
 const ES_PROTEGIDO = 'EXISTS (SELECT 1 FROM administrador_inicial ai WHERE ai.id_usuario = u.id_usuario) AS protegido';
 
 
-// Realiza una tarea importante de este modulo.
+// Obtiene la fecha y hora actual.
 function fechaHoraActual() {
   const d = new Date();
   const dos = (n) => String(n).padStart(2, '0');
@@ -37,7 +37,7 @@ function fechaHoraActual() {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Recibe el inicio de sesion.
 router.post('/login', limiteInicioSesion, async (req, res) => {
   const datos = req.body || {};
   const correo = String(datos.correo ?? '').trim();
@@ -75,20 +75,20 @@ router.post('/login', limiteInicioSesion, async (req, res) => {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Comprueba si existe el administrador inicial.
 async function administradorInicialExiste() {
   const { rows: filas } = await db.query('SELECT COUNT(*) AS total FROM administrador_inicial');
   return filas[0].total > 0;
 }
 
 
-// Atiende una accion o consulta de este modulo.
+// Crea el primer administrador.
 router.get('/configuracion-inicial', async (req, res) => {
   res.json({ pendiente: !await administradorInicialExiste() });
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Crea el primer administrador.
 router.post('/configuracion-inicial', limiteConfiguracion, async (req, res) => {
   if (await administradorInicialExiste()) {
     return res.status(409).json({ error: calc.MENSAJES.configuracionHecha });
@@ -135,7 +135,7 @@ router.post('/configuracion-inicial', limiteConfiguracion, async (req, res) => {
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Entrega los datos de la sesion activa.
 router.get('/sesion', async (req, res) => {
   const usuario = await sesionVigente(req);
   if (!usuario) return res.status(401).json({ error: 'No hay una sesión activa' });
@@ -145,7 +145,7 @@ router.get('/sesion', async (req, res) => {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Exige una sesion valida de administrador.
 async function requiereAdmin(req, res, next) {
   const usuario = req.session.usuario;
   if (!usuario) return res.status(401).json({ error: 'Debe iniciar sesión' });
@@ -154,13 +154,13 @@ async function requiereAdmin(req, res, next) {
   next();
 }
 
-// Atiende una accion o consulta de este modulo.
+// Aplica esta comprobación antes de continuar.
 router.use(requiereAdmin);
 
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Entrega los datos del panel.
 router.get('/panel', async (req, res) => {
   const { rows: totales } = await db.query(
     
@@ -217,7 +217,7 @@ router.get('/panel', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Aprueba una incidencia reportada.
 router.post('/incidencias/:id/aprobar', async (req, res) => {
   if (!calc.identificadorValido(req.params.id)) return res.status(404).json({ error: calc.MENSAJES.incidenciaNoEncontrada });
   const { rows: filas } = await db.query('SELECT estado FROM punto_critico WHERE id_punto = $1', [Number(req.params.id)]);
@@ -229,7 +229,7 @@ router.post('/incidencias/:id/aprobar', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o elimina una incidencia.
 router.delete('/incidencias/:id', async (req, res) => {
   const resultado = calc.identificadorValido(req.params.id)
     ? await db.query('DELETE FROM punto_critico WHERE id_punto = $1', [Number(req.params.id)])
@@ -244,7 +244,7 @@ router.delete('/incidencias/:id', async (req, res) => {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Lee los valores normativos guardados.
 async function tablaMaestra() {
   const { rows: coef } = await db.query('SELECT tipo, valor FROM coeficiente_normativo');
   const coeficientes = { Cp: null, Ci: null };
@@ -267,13 +267,13 @@ async function tablaMaestra() {
 }
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o cambia parámetros normativos.
 router.get('/tabla-maestra', async (req, res) => {
   res.json(await tablaMaestra());
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o cambia parámetros normativos.
 router.post('/tabla-maestra', async (req, res) => {
   const datos = req.body || {};
   const tipo = datos.tipo;
@@ -315,7 +315,7 @@ router.post('/tabla-maestra', async (req, res) => {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Consulta las cuentas y su estado.
 async function todosLosUsuarios(idSesion) {
   const { rows: filas } = await db.query(
     `SELECT u.id_usuario, u.nombre, u.correo, u.activo, ${ES_PROTEGIDO}, r.nombre AS rol
@@ -330,7 +330,7 @@ async function todosLosUsuarios(idSesion) {
 }
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o crea cuentas.
 router.get('/usuarios', async (req, res) => {
   const usuarios = await todosLosUsuarios(req.session.usuario.id);
   if (req.query.buscar === undefined) return res.json({ usuarios });
@@ -344,7 +344,7 @@ router.get('/usuarios', async (req, res) => {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Prepara el correo enviado al crear una cuenta.
 function textoCuentaCreada(nombre, correo, rol, temporal) {
   const acceso = rol === ROL_ADMIN ? 'Acceso administrativo (admin.html)' : 'inicio de sesión de SEHIP';
   return `Hola ${nombre}:\n\nSe creó tu cuenta en SEHIP con el rol ${rol}.\n\n`
@@ -354,7 +354,7 @@ function textoCuentaCreada(nombre, correo, rol, temporal) {
 }
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o crea cuentas.
 router.post('/usuarios', limiteCreacionCuentas, async (req, res) => {
   const datos = req.body || {};
   const nombre = String(datos.nombre ?? '').trim();
@@ -405,7 +405,7 @@ router.post('/usuarios', limiteCreacionCuentas, async (req, res) => {
 });
 
 
-// Realiza una tarea importante de este modulo.
+// Busca una cuenta por su identificador.
 async function buscarCuenta(idTexto) {
   if (!calc.identificadorValido(idTexto)) return null;
   const id = Number(idTexto);
@@ -421,7 +421,7 @@ async function buscarCuenta(idTexto) {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Cambia el rol de una cuenta.
 router.post('/usuarios/:id/rol', async (req, res) => {
   const rolNuevo = (req.body || {}).rol;
   const cuenta = await buscarCuenta(req.params.id);
@@ -458,7 +458,7 @@ router.post('/usuarios/:id/rol', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Explica una parte importante de este codigo.
 router.post('/usuarios/:id/desactivar', async (req, res) => {
   const cuenta = await buscarCuenta(req.params.id);
   if (!cuenta) return res.status(404).json({ error: calc.MENSAJES.usuarioNoExiste });
@@ -477,7 +477,7 @@ router.post('/usuarios/:id/desactivar', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Explica una parte importante de este codigo.
 router.post('/usuarios/:id/reactivar', async (req, res) => {
   const cuenta = await buscarCuenta(req.params.id);
   if (!cuenta) return res.status(404).json({ error: calc.MENSAJES.usuarioNoExiste });
@@ -490,7 +490,7 @@ router.post('/usuarios/:id/reactivar', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Explica una parte importante de este codigo.
 router.delete('/usuarios/:id', async (req, res) => {
   const cuenta = await buscarCuenta(req.params.id);
   if (!cuenta) return res.status(404).json({ error: calc.MENSAJES.usuarioNoExiste });
