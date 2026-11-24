@@ -1,4 +1,4 @@
-// Entrega datos publicos y recibe reportes ciudadanos.
+// Atiende consultas publicas y reportes.
 const express = require('express');
 const db = require('../db');
 const calc = require('../../public/js/validaciones');
@@ -13,14 +13,14 @@ const MAXIMO_PENDIENTES = 300;
 
 
 
-// Realiza una tarea importante de este modulo.
+// Obtiene la fecha y hora actual.
 function fechaHoraActual() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' });
 }
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Entrega los datos publicos de la app.
 router.get('/catalogo', async (req, res) => {
   
   const { rows: alcaldias } = await db.query('SELECT id_alcaldia AS id, nombre FROM alcaldia ORDER BY nombre');
@@ -36,7 +36,7 @@ router.get('/catalogo', async (req, res) => {
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o recibe incidencias.
 router.get('/incidencias', async (req, res) => {
   const { rows: incidencias } = await db.query(
     `SELECT p.id_punto AS id, p.id_alcaldia AS "idAlcaldia", a.nombre AS alcaldia, p.latitud, p.longitud,
@@ -54,7 +54,7 @@ router.get('/incidencias', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o recibe incidencias.
 router.post('/incidencias', limiteReportesCiudadanos, async (req, res) => {
   const datos = req.body || {};
   const tipo = datos.tipo;
