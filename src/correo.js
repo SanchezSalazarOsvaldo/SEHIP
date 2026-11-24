@@ -1,4 +1,4 @@
-// Envia correos por Brevo, SMTP o como archivos locales.
+// Envia correos de cuentas y recuperación.
 require('./entorno');
 
 const fs = require('fs');
@@ -10,7 +10,7 @@ const TIEMPO_MAXIMO_MS = 5000;
 
 
 
-// Realiza una tarea importante de este modulo.
+// Elige el medio usado para enviar correo.
 function modoCorreo() {
   if (process.env.BREVO_API_KEY) return 'brevo';
   if (process.env.SMTP_USUARIO && process.env.SMTP_CONTRASENA) return 'smtp';
@@ -18,14 +18,14 @@ function modoCorreo() {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Obtiene la dirección que envia los mensajes.
 function remitente() {
   return process.env.CORREO_REMITENTE || process.env.SMTP_USUARIO || 'no-responder@sehip.mx';
 }
 
 
 
-// Realiza una tarea importante de este modulo.
+// Forma la fecha usada en el nombre del correo.
 function marcaDeTiempo() {
   const d = new Date();
   const dos = (n) => String(n).padStart(2, '0');
@@ -33,7 +33,7 @@ function marcaDeTiempo() {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Envia el correo con Brevo.
 async function enviarConBrevo({ para, asunto, texto }) {
   const respuesta = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
@@ -55,7 +55,7 @@ async function enviarConBrevo({ para, asunto, texto }) {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Envia el correo con SMTP.
 async function enviarConSmtp({ para, asunto, texto }) {
   
   const nodemailer = require('nodemailer');
@@ -70,7 +70,7 @@ async function enviarConSmtp({ para, asunto, texto }) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Guarda el correo en un archivo local.
 function guardarEnArchivo({ para, asunto, texto }) {
   fs.mkdirSync(CARPETA_CORREOS, { recursive: true });
   const fecha = marcaDeTiempo();
@@ -82,7 +82,7 @@ function guardarEnArchivo({ para, asunto, texto }) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Envia el correo con el medio disponible.
 async function enviarCorreo(mensaje) {
   const modo = modoCorreo();
   if (modo === 'brevo') return enviarConBrevo(mensaje);
