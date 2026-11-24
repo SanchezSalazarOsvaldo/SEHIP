@@ -264,3 +264,352 @@ async function cargarPanel() {
   estadoAdmin.capasDatos = [grupo, grupoPendientes, obras, proyectos];
   setTimeout(() => estadoAdmin.mapa.invalidateSize(), 50);
 }
+
+// SEGUNDO COMMIT DEL ARCHIVO cada cuenta muestra solo los botones permitidos (el administrador inicial y la cuenta propia no ofrecen acciones prohibidas).
+// la interfaz solo es comodidad; la regla real está en admin.js y en los triggers.
+// ---------- RF-ADM-03: tabla maestra ----------
+
+// Valor vigente del parámetro elegido en el formulario (Cp, Ci o una intensidad).
+function valorParametroSeleccionado() {
+  const t = estadoAdmin.tabla;
+  const tipo = $('tipo-parametro').value;
+  if (tipo !== 'intensidad') return t.coeficientes[tipo];
+  const fila = t.intensidades.find((f) => String(f.idAlcaldia) === $('parametro-alcaldia').value);
+  return fila ? fila.valores[$('parametro-periodo').value] : null;
+}
+
+// Actualiza el formulario según el parámetro elegido (campos visibles, valor vigente y rango).
+function pintarParametroSeleccionado() {
+  const esIntensidad = $('tipo-parametro').value === 'intensidad';
+  $('campos-intensidad').classList.toggle('oculto', !esIntensidad);
+  const valor = valorParametroSeleccionado();
+  $('valor-vigente').textContent = valor == null
+    ? 'Sin capturar'
+    : `${numero(valor, 2)}${esIntensidad ? ' mm/h' : ''}`;
+  $('rango-parametro').textContent = esIntensidad
+    ? 'Rango normativo: 10.00 a 250.00 mm/h, hasta dos decimales.'
+    : 'Rango normativo: 0.05 a 0.95, hasta dos decimales.';
+  document.querySelectorAll('.celda-intensidad').forEach((c) => {
+    c.classList.toggle('seleccionada', esIntensidad
+      && c.dataset.alcaldia === $('parametro-alcaldia').value && c.dataset.periodo === $('parametro-periodo').value);
+  });
+  document.querySelectorAll('.metrica-boton').forEach((b) => {
+    b.classList.toggle('seleccionada', b.dataset.tipo === $('tipo-parametro').value);
+  });
+}
+
+// Dibuja Cp, Ci y la tabla de intensidades; las celdas sin valor muestran 'Sin capturar'.
+function pintarTabla(tabla) {
+  estadoAdmin.tabla = tabla;
+  $('valor-cp').textContent = tabla.coeficientes.Cp == null ? 'Sin capturar' : numero(tabla.coeficientes.Cp, 2);
+  $('valor-ci').textContent = tabla.coeficientes.Ci == null ? 'Sin capturar' : numero(tabla.coeficientes.Ci, 2);
+  const select = $('parametro-alcaldia');
+  if (select.options.length === 0) {
+    tabla.intensidades.forEach((f) => select.add(new Option(f.alcaldia, f.idAlcaldia)));
+  }
+  $('tabla-intensidades').innerHTML = tabla.intensidades.map((f) => `
+    <tr>
+      <td>${escapar(f.alcaldia)}</td>
+      ${PERIODOS_RETORNO.map((p) => {
+        const v = f.valores[p];
+        return `<td class="num"><button type="button" class="celda-intensidad ${v == null ? 'sin-valor' : ''}"
+          data-alcaldia="${f.idAlcaldia}" data-periodo="${p}">${v == null ? 'Sin capturar' : numero(v, 2)}</button></td>`;
+      }).join('')}
+    </tr>`).join('');
+  pintarParametroSeleccionado();
+}
+
+// Pide la tabla maestra al servidor y la dibuja.
+async function cargarTabla() {
+  const tabla = await obtenerTablaMaestra();
+  if (!revisarAcceso(tabla)) return;
+  if (tabla.ok) pintarTabla(tabla);
+}
+
+// ---------- RF-ADM-04 a RF-ADM-07: usuarios ----------
+
+// Dibuja la tabla de cuentas con los botones permitidos para cada una (cambiar rol, desactivar,
+// reactivar o eliminar); el administrador inicial y la cuenta propia no ofrecen las acciones prohibidas.
+function pintarUsuarios(usuarios) {
+  $('conteo-usuarios').textContent = `${usuarios.length} cuenta${usuarios.length === 1 ? '' : 's'}`;
+  if (usuarios.length === 0) {
+    $('tabla-usuarios').innerHTML = '<tr><td colspan="5" class="tabla-vacia">Sin resultados</td></tr>';
+    return;
+  }
+  $('tabla-usuarios').innerHTML = usuarios.map((u) => `
+    <tr class="${u.activo ? '' : 'fila-inactiva'}">
+      <td>
+        <div class="usuario-celda">${escapar(u.nombre)}
+          ${u.propio ? '<span class="etiqueta-mini">Tú</span>' : ''}
+          ${u.protegido ? '<span class="etiqueta-mini etiqueta-inicial">Administrador inicial</span>' : ''}
+        </div>
+      </td>
+      <td>${escapar(u.correo)}</td>
+      <td>
+        <div class="control-rol">
+          <select class="select-rol" data-id="${u.id}" aria-label="Rol de ${escapar(u.nombre)}">
+            ${ROLES.map((r) => `<option ${r === u.rol ? 'selected' : ''}>${r}</option>`).join('')}
+          </select>
+          <button type="button" class="boton boton-contorno boton-chico" data-accion="rol" data-id="${u.id}">Guardar rol</button>
+        </div>
+      </td>
+      <td><span class="chip ${u.activo ? 'chip-calculado' : 'chip-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+      <td>
+        ${u.activo
+          ? `<button type="button" class="boton boton-peligro boton-chico" data-accion="desactivar" data-id="${u.id}">
+              Desactivar cuenta
+            </button>`
+          : `<div class="acciones-cuenta">
+              <button type="button" class="boton boton-contorno boton-chico" data-accion="reactivar" data-id="${u.id}">
+                Reactivar cuenta
+              </button>
+              ${u.protegido || u.propio ? '' : `<button type="button" class="boton boton-peligro boton-chico" data-accion="eliminar" data-id="${u.id}">
+                Eliminar cuenta
+              </button>`}
+            </div>`}
+      </td>
+    </tr>`).join('');
+}
+
+// texto null muestra todas las cuentas; con texto aplica la búsqueda de RF-ADM-05.
+async function cargarUsuarios(texto = null) {
+  const resultado = await buscarUsuarios(texto);
+  if (!revisarAcceso(resultado)) return;
+  $('msg-usuarios').innerHTML = '';
+  if (!resultado.ok) {
+    mostrarMensaje('msg-usuarios', 'error', resultado.error);
+    if (resultado.usuarios) pintarUsuarios(resultado.usuarios);
+    return;
+  }
+  estadoAdmin.filtro = texto;
+  pintarUsuarios(resultado.usuarios);
+}
+
+// Después de una operación se conserva el filtro aplicado (si sigue habiendo coincidencias).
+async function refrescarUsuarios() {
+  if (estadoAdmin.filtro) {
+    const filtrados = await buscarUsuarios(estadoAdmin.filtro);
+    if (filtrados.ok) {
+      pintarUsuarios(filtrados.usuarios);
+      return;
+    }
+  }
+  estadoAdmin.filtro = null;
+  $('texto-buscar').value = '';
+  pintarUsuarios((await buscarUsuarios()).usuarios);
+}
+
+// ---------- Eventos ----------
+
+// Botones de las pestañas.
+document.querySelectorAll('.pestana').forEach((b) => b.addEventListener('click', () => mostrarPestana(b.dataset.pestana)));
+
+// Al cambiar el parámetro, la alcaldía o el período se muestra su valor vigente.
+$('tipo-parametro').addEventListener('change', pintarParametroSeleccionado);
+$('parametro-alcaldia').addEventListener('change', pintarParametroSeleccionado);
+$('parametro-periodo').addEventListener('change', pintarParametroSeleccionado);
+
+// Clic en un valor de la tabla: lo selecciona para editarlo.
+$('tabla-intensidades').addEventListener('click', (evento) => {
+  const celda = evento.target.closest('.celda-intensidad');
+  if (!celda) return;
+  $('tipo-parametro').value = 'intensidad';
+  $('parametro-alcaldia').value = celda.dataset.alcaldia;
+  $('parametro-periodo').value = celda.dataset.periodo;
+  $('msg-parametro').innerHTML = '';
+  pintarParametroSeleccionado();
+  $('valor-parametro').focus();
+});
+// Clic en Cp o Ci: lo selecciona para editarlo.
+document.querySelectorAll('.metrica-boton').forEach((b) => b.addEventListener('click', () => {
+  $('tipo-parametro').value = b.dataset.tipo;
+  $('msg-parametro').innerHTML = '';
+  pintarParametroSeleccionado();
+  $('valor-parametro').focus();
+}));
+
+// RF-ADM-03: actualizar parámetro.
+$('form-parametro').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const resultado = await actualizarParametro({
+    tipo: $('tipo-parametro').value,
+    idAlcaldia: $('parametro-alcaldia').value,
+    periodo: $('parametro-periodo').value,
+    valor: $('valor-parametro').value
+  });
+  if (!revisarAcceso(resultado)) return;
+  if (!resultado.ok) {
+    mostrarMensaje('msg-parametro', 'error', resultado.error);
+    return;
+  }
+  $('valor-parametro').value = '';
+  pintarTabla(resultado);
+  mostrarMensaje('msg-parametro', 'exito', resultado.mensaje);
+});
+
+// RF-ADM-04: crear cuenta.
+$('form-cuenta').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const boton = evento.target.querySelector('button');
+  boton.disabled = true;
+  const resultado = await crearCuenta($('cuenta-nombre').value, $('cuenta-correo').value, $('cuenta-rol').value);
+  boton.disabled = false;
+  if (!revisarAcceso(resultado)) return;
+  if (!resultado.ok) {
+    mostrarMensaje('msg-cuenta', 'error', resultado.error);
+    return;
+  }
+  evento.target.reset();
+  mostrarMensaje('msg-cuenta', 'exito', resultado.mensaje);
+  await refrescarUsuarios();
+});
+
+// RF-ADM-05: filtrar usuarios.
+$('form-buscar').addEventListener('submit', (evento) => {
+  evento.preventDefault();
+  cargarUsuarios($('texto-buscar').value.trim());
+});
+// Quita el filtro y vuelve a mostrar todas las cuentas.
+$('boton-todos').addEventListener('click', () => {
+  $('texto-buscar').value = '';
+  cargarUsuarios(null);
+});
+
+// RF-ADM-06, RF-ADM-07 y eliminación: acciones de cada fila.
+const TEXTOS_CONFIRMACION = {
+  desactivar: { normal: 'Desactivar cuenta', confirmar: 'Confirmar desactivación' },
+  eliminar: { normal: 'Eliminar cuenta', confirmar: 'Confirmar eliminación' }
+};
+// Temporizador que cancela la confirmación pendiente a los 4 segundos.
+let temporizadorConfirmacion;
+$('tabla-usuarios').addEventListener('click', async (evento) => {
+  const boton = evento.target.closest('button[data-accion]');
+  if (!boton) return;
+  const id = Number(boton.dataset.id);
+
+  if (boton.dataset.accion === 'rol') {
+    const rol = document.querySelector(`.select-rol[data-id="${id}"]`).value;
+    const resultado = await modificarRol(id, rol);
+    if (!revisarAcceso(resultado)) return;
+    if (!resultado.ok) {
+      mostrarMensaje('msg-usuarios', 'error', resultado.error);
+      await refrescarUsuarios();
+      return;
+    }
+    mostrarMensaje('msg-usuarios', 'exito', resultado.mensaje);
+    await refrescarUsuarios();
+    return;
+  }
+
+  // Reactivar no pide confirmación: devuelve la cuenta a su estado anterior.
+  if (boton.dataset.accion === 'reactivar') {
+    const resultado = await reactivarCuenta(id);
+    if (!revisarAcceso(resultado)) return;
+    mostrarMensaje('msg-usuarios', resultado.ok ? 'exito' : 'error', resultado.ok ? resultado.mensaje : resultado.error);
+    if (resultado.ok) snackbar(resultado.mensaje);
+    await refrescarUsuarios();
+    return;
+  }
+
+  // Desactivar y eliminar piden una segunda pulsación para confirmar: desactivar deja a la persona sin
+  // acceso y eliminar borra la cuenta con todo su historial de forma definitiva.
+  const textos = TEXTOS_CONFIRMACION[boton.dataset.accion];
+  if (!boton.classList.contains('confirmando')) {
+    document.querySelectorAll('.confirmando').forEach((b) => {
+      b.classList.remove('confirmando');
+      b.textContent = TEXTOS_CONFIRMACION[b.dataset.accion].normal;
+    });
+    boton.classList.add('confirmando');
+    boton.textContent = textos.confirmar;
+    clearTimeout(temporizadorConfirmacion);
+    temporizadorConfirmacion = setTimeout(() => {
+      boton.classList.remove('confirmando');
+      boton.textContent = textos.normal;
+    }, 4000);
+    return;
+  }
+  const resultado = boton.dataset.accion === 'eliminar' ? await eliminarCuenta(id) : await desactivarCuenta(id);
+  if (!revisarAcceso(resultado)) return;
+  if (!resultado.ok) {
+    mostrarMensaje('msg-usuarios', 'error', resultado.error);
+    await refrescarUsuarios();
+    return;
+  }
+  mostrarMensaje('msg-usuarios', 'exito', resultado.mensaje);
+  snackbar(resultado.mensaje);
+  await refrescarUsuarios();
+});
+
+// Eliminar una incidencia desde su ventana en el mapa: el primer clic pide confirmación (4 s).
+// Se escucha en fase de captura (true) porque Leaflet detiene la propagación de los clics dentro de
+// sus ventanas emergentes.
+let temporizadorIncidencia;
+$('mapa-incidencias').addEventListener('click', async (evento) => {
+  // Aprobar un reporte ciudadano no pide confirmación: se puede eliminar después si hace falta.
+  const aprobar = evento.target.closest('.boton-aprobar');
+  if (aprobar) {
+    aprobar.disabled = true;
+    const resultado = await aprobarIncidencia(aprobar.dataset.id);
+    if (!revisarAcceso(resultado)) return;
+    estadoAdmin.mapa.closePopup();
+    if (!resultado.ok) mostrarMensaje('msg-panel', 'error', resultado.error);
+    else snackbar(resultado.mensaje);
+    await cargarPanel();
+    return;
+  }
+  const boton = evento.target.closest('.boton-incidencia');
+  if (!boton) return;
+  if (!boton.classList.contains('confirmando')) {
+    boton.classList.add('confirmando');
+    boton.textContent = 'Confirmar eliminación';
+    clearTimeout(temporizadorIncidencia);
+    temporizadorIncidencia = setTimeout(() => {
+      boton.classList.remove('confirmando');
+      boton.textContent = 'Eliminar incidencia';
+    }, 4000);
+    return;
+  }
+  clearTimeout(temporizadorIncidencia);
+  boton.disabled = true;
+  const resultado = await eliminarIncidencia(boton.dataset.id);
+  if (!revisarAcceso(resultado)) return;
+  estadoAdmin.mapa.closePopup();
+  if (!resultado.ok) {
+    mostrarMensaje('msg-panel', 'error', resultado.error);
+    return;
+  }
+  snackbar(resultado.mensaje);
+  await cargarPanel();
+}, true);
+
+// RF-ADM-13: cerrar sesión.
+$('boton-salir').addEventListener('click', async () => {
+  await cerrarSesionAdmin();
+  window.location.href = 'admin.html';
+});
+
+// ---------- Inicio ----------
+
+async function iniciarAdmin() {
+  const sesion = await sesionAdministrador();
+  if (sesion.estado === 'sin-sesion') {
+    window.location.href = 'admin.html';
+    return;
+  }
+  if (sesion.estado === 'denegado') {
+    $('nombre-usuario').textContent = sesion.usuario.nombre;
+    mostrarAccesoDenegado();
+    return;
+  }
+  if (sesion.usuario.debeCambiarContrasena) {
+    window.location.href = 'contrasena.html';
+    return;
+  }
+  estadoAdmin.usuario = sesion.usuario;
+  $('nombre-usuario').textContent = sesion.usuario.nombre;
+  $('contenido-admin').classList.remove('oculto');
+  mostrarPestana('panel');
+}
+
+iniciarAdmin();
+
