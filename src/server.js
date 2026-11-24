@@ -1,4 +1,4 @@
-// Configura el servidor web y organiza las rutas.
+// Inicia el servidor y organiza las rutas.
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
@@ -30,7 +30,7 @@ app.disable('x-powered-by');
 if (EN_PRODUCCION) app.set('trust proxy', 1);
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');       
   res.setHeader('X-Frame-Options', 'DENY');                 
@@ -43,7 +43,7 @@ app.use((req, res, next) => {
 });
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use((req, res, next) => {
   if (EN_PRODUCCION && req.get('x-forwarded-proto') === 'http') {
     return res.redirect(301, `https://${req.get('host')}${req.originalUrl}`);
@@ -53,7 +53,7 @@ app.use((req, res, next) => {
 
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use('/api', limiteGeneral);
 
 
@@ -61,7 +61,7 @@ app.use('/api', limiteGeneral);
 
 const jsonNormal = express.json({ limit: '100kb' });
 const jsonReporte = express.json({ limit: '15mb' });
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use((req, res, next) => {
   const esReporte = /^\/api\/proyectos\/[^/]+\/reportes$/.test(req.path);
   return esReporte ? jsonReporte(req, res, next) : jsonNormal(req, res, next);
@@ -69,7 +69,7 @@ app.use((req, res, next) => {
 
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use(session({
   store: new AlmacenSesiones(),
   secret: process.env.SESION_SECRETO || 'sehip-clave-de-sesion',
@@ -79,18 +79,18 @@ app.use(session({
 }));
 
 
-// Configura una parte de las respuestas del servidor.
+// Configura una parte del servidor.
 app.get('/api/salud', async (req, res) => {
   await db.query('SELECT 1');
   res.json({ estado: 'ok' });
 });
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use('/api', (req, res, next) => {
   if (req.method !== 'GET' && req.session.usuario) return limiteEscrituraPorUsuario(req, res, next);
   next();
@@ -98,25 +98,25 @@ app.use('/api', (req, res, next) => {
 
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use('/api/publico', rutasPublico);
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use('/api/admin', rutasAdmin);
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use('/api', rutasAuth);
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use('/api', rutasCuenta);
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use('/api', rutasProyectos);
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use('/api', (req, res) => res.status(404).json({ error: MENSAJES.rutaNoEncontrada }));
 
 
 
 
-// Configura una parte de las respuestas del servidor.
+// Aplica esta comprobación antes de continuar.
 app.use((err, req, res, next) => {
   if (err.type === 'entity.too.large') return res.status(413).json({ error: MENSAJES.solicitudMuyGrande });
   if (err.status && err.status < 500) return res.status(err.status).json({ error: MENSAJES.solicitudInvalida });
