@@ -1,4 +1,4 @@
-// Controla el inicio de sesion y el acceso de ingenieros.
+// Controla el inicio de sesion de ingenieros.
 const express = require('express');
 const bcrypt = require('bcryptjs');
 
@@ -14,7 +14,7 @@ const router = express.Router();
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Recibe el inicio de sesion.
 router.post('/login', limiteInicioSesion, async (req, res) => {
   const datos = req.body || {};
   const correo = String(datos.correo ?? '').trim();
@@ -58,7 +58,7 @@ router.post('/login', limiteInicioSesion, async (req, res) => {
 });
 
 
-// Realiza una tarea importante de este modulo.
+// Prepara los datos que guarda la sesion.
 function datosSesion(fila) {
   return {
     id: fila.id_usuario,
@@ -70,14 +70,14 @@ function datosSesion(fila) {
 }
 
 
-// Atiende una accion o consulta de este modulo.
+// Cierra la sesion del usuario.
 router.post('/logout', (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
 
 
-// Realiza una tarea importante de este modulo.
+// Comprueba si la cuenta sigue activa.
 async function sesionVigente(req) {
   const usuario = req.session.usuario;
   if (!usuario) return null;
@@ -94,7 +94,7 @@ async function sesionVigente(req) {
 }
 
 
-// Atiende una accion o consulta de este modulo.
+// Entrega los datos de la sesion activa.
 router.get('/sesion', async (req, res) => {
   const usuario = await sesionVigente(req);
   if (!usuario) return res.status(401).json({ error: 'No hay una sesión activa' });
@@ -104,7 +104,7 @@ router.get('/sesion', async (req, res) => {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Revisa si la cuenta puede seguir usando el sistema.
 async function cuentaHabilitada(req, res) {
   const { rows: filas } = await db.query(
     'SELECT activo, debe_cambiar_contrasena FROM usuario WHERE id_usuario = $1',
@@ -123,7 +123,7 @@ async function cuentaHabilitada(req, res) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Exige una sesion valida de ingeniero.
 async function requiereSesion(req, res, next) {
   if (!req.session.usuario) {
     return res.status(401).json({ error: 'Debe iniciar sesión' });
