@@ -270,7 +270,7 @@ CREATE INDEX idx_sesion_expira ON sesion (expira);
 -- ---------------------------------------------------------------------
 CREATE FUNCTION fn_proteger_administrador_inicial() RETURNS TRIGGER -- Un trigger no es más que una restriccion especial que se ejecuta automáticamente antes o después de una operación de inserción, actualización o eliminación en una tabla. En este caso, el trigger se ejecuta antes de actualizar la tabla usuario.
 LANGUAGE plpgsql AS $$ -- plpgsql = Procedural Language/PostgreSQL; permite escribir funciones y triggers con lógica de programación, como condicionales y bucles.
-BEGIN
+BEGIN -- Aqui no es necesario especificar el tipo de operación que se está realizando (INSERT, UPDATE o DELETE) porque el trigger solo se ejecuta antes de una actualización (BEFORE UPDATE).
     IF EXISTS (SELECT 1 FROM administrador_inicial WHERE id_usuario = OLD.id_usuario) THEN -- NEW y OLD son registros especiales que representan los valores de la fila antes y después de la operación. En este caso, se verifica si la fila que se está actualizando es la del administrador inicial.
         IF NOT NEW.activo THEN
             RAISE EXCEPTION 'El administrador inicial no puede deshabilitarse.';
@@ -291,7 +291,7 @@ CREATE TRIGGER trg_usuario_antes_actualizar BEFORE UPDATE ON usuario
 CREATE FUNCTION fn_administrador_inicial_fijo() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF TG_OP = 'INSERT' THEN
+    IF TG_OP = 'INSERT' THEN -- Aqui es necesario especificar el tipo de operación que se está realizando (INSERT, UPDATE o DELETE) para que la función pueda validar correctamente la operación y lanzar una excepción si no se cumple la condición.
         IF NOT EXISTS (SELECT 1 FROM usuario u JOIN rol r ON r.id_rol = u.id_rol -- Esto asegura que la cuenta que se está insertando como administrador inicial sea una cuenta activa de administrador.
                         WHERE u.id_usuario = NEW.id_usuario AND u.activo
                           AND r.nombre = 'Administrador del Sistema') THEN
