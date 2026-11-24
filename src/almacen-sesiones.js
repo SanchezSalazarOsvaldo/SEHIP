@@ -1,4 +1,4 @@
-// Guarda las sesiones de usuario en la base de datos.
+// Guarda las sesiones en la base de datos.
 const session = require('express-session');
 const db = require('./db');
 
@@ -8,7 +8,7 @@ const DURACION_POR_DEFECTO_MS = 8 * 60 * 60 * 1000;
 const LIMPIEZA_CADA_MS = 60 * 60 * 1000;
 
 
-// Realiza una tarea importante de este modulo.
+// Calcula cuándo vence una sesion.
 function vencimiento(datos) {
   const expira = datos && datos.cookie && datos.cookie.expires;
   return new Date(expira || Date.now() + DURACION_POR_DEFECTO_MS).toISOString();
@@ -16,7 +16,7 @@ function vencimiento(datos) {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Agrupa el almacen de sesiones.
 class AlmacenSesiones extends session.Store {
   constructor() {
     super();
