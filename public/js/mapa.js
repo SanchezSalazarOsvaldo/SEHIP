@@ -1,4 +1,4 @@
-// Dibuja proyectos, zonas y obras en el mapa.
+// Dibuja proyectos y obras en el mapa.
 const COLORES_SEMAFORO = {
   verde: '#3F6B22',
   amarillo: '#E0A800',
@@ -41,7 +41,7 @@ const estadoMapa = {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Convierte texto en contenido seguro.
 function escaparMapa(texto) {
   const div = document.createElement('div');
   div.textContent = texto ?? '';
@@ -49,7 +49,7 @@ function escaparMapa(texto) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Retira una capa del mapa.
 function quitarCapa(nombre) {
   if (estadoMapa[nombre]) {
     estadoMapa.mapa.removeLayer(estadoMapa[nombre]);
@@ -58,7 +58,7 @@ function quitarCapa(nombre) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Cambia el tamaño de un circulo poco a poco.
 function animarRadio(circulo, radioFinal) {
   const radioInicial = circulo.getRadius();
   if (Math.abs(radioInicial - radioFinal) < 0.1) return;
@@ -74,7 +74,7 @@ function animarRadio(circulo, radioFinal) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Dibuja o actualiza un circulo del mapa.
 function circuloSimulacion(nombre, centro, radio, estilo) {
   if (!radio) {
     quitarCapa(nombre);
@@ -95,7 +95,7 @@ function circuloSimulacion(nombre, centro, radio, estilo) {
 const capasBase = [];
 
 
-// Realiza una tarea importante de este modulo.
+// Carga el fondo del mapa y cambia si falla.
 function obtenerCapaBase(indice) {
   if (capasBase[indice]) return capasBase[indice];
   const proveedor = PROVEEDORES_MAPA[indice];
@@ -120,7 +120,7 @@ function obtenerCapaBase(indice) {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Crea el mapa y sus controles.
 function iniciarMapa(idContenedor, eventos) {
   const mapa = L.map(idContenedor, { minZoom: 10, maxZoom: 18, zoomSnap: 0.25 });
   estadoMapa.mapa = mapa;
@@ -196,7 +196,7 @@ function iniciarMapa(idContenedor, eventos) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Marca la alcaldia del punto mostrado.
 function resaltarAlcaldia(nombre) {
   if (estadoMapa.resaltada && estadoMapa.capas[estadoMapa.resaltada]) {
     estadoMapa.capas[estadoMapa.resaltada].setStyle({ weight: 1.2, fillOpacity: 0.04, color: '#006B78' });
@@ -210,7 +210,7 @@ function resaltarAlcaldia(nombre) {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Crea el marcador visual del proyecto.
 function iconoPin(color, etiqueta) {
   return L.divIcon({
     className: 'pin-proyecto',
@@ -224,7 +224,7 @@ function iconoPin(color, etiqueta) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Muestra el pin que puede mover el usuario.
 function mostrarPin(latitud, longitud, opciones) {
   const posicion = [latitud, longitud];
   if (!estadoMapa.pin) {
@@ -250,13 +250,13 @@ function mostrarPin(latitud, longitud, opciones) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Retira el pin del proyecto.
 function quitarPin() {
   quitarCapa('pin');
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Acerca el mapa a una ubicación.
 function centrarEn(latitud, longitud, zoom = 16) {
   estadoMapa.mapa.flyTo([latitud, longitud], zoom, { duration: 0.6 });
 }
@@ -271,7 +271,7 @@ function centrarEn(latitud, longitud, zoom = 16) {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Dibuja el predio, zonas y obra.
 function dibujarSimulacion(datos) {
   const { centro } = datos;
 
@@ -331,7 +331,7 @@ function dibujarSimulacion(datos) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Quita del mapa una simulacion.
 function limpiarSimulacion() {
   ['predio', 'zonaAntes', 'zonaActual', 'obra', 'linea'].forEach(quitarCapa);
 }
@@ -343,7 +343,7 @@ const ANILLOS_EFICIENCIA = [0.9, 0.75];
 
 
 
-// Realiza una tarea importante de este modulo.
+// Crea la etiqueta de eficiencia.
 function etiquetaAnillo(centro, radio, texto) {
   
   const latitud = centro[0] - radio / 111320;
@@ -356,7 +356,7 @@ function etiquetaAnillo(centro, radio, texto) {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Muestra anillos para colocar una obra.
 function mostrarGuiaObra(centro, radio) {
   const zona = estadoMapa.guiaZona;
   const sinCambios = zona && zona.radio === radio && zona.centro[0] === centro[0] && zona.centro[1] === centro[1];
@@ -377,7 +377,7 @@ function mostrarGuiaObra(centro, radio) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Oculta la guia de ubicación de obra.
 function ocultarGuiaObra() {
   quitarCapa('guia');
   estadoMapa.guiaZona = null;
@@ -386,7 +386,7 @@ function ocultarGuiaObra() {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Encuadra el proyecto o la zona afectada.
 function centrarSimulacion() {
   if (estadoMapa.zonaActual || estadoMapa.predio) {
     encuadrarZona();
@@ -398,7 +398,7 @@ function centrarSimulacion() {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Ajusta el mapa para ver la zona completa.
 function encuadrarZona() {
   const zona = estadoMapa.zonaAntes || estadoMapa.zonaActual || estadoMapa.predio;
   if (!zona) return;
@@ -415,7 +415,7 @@ function encuadrarZona() {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Muestra o oculta los datos junto al mapa.
 function actualizarPanelMapa(html) {
   const div = estadoMapa.panel.getContainer();
   div.innerHTML = html || '';
@@ -423,7 +423,7 @@ function actualizarPanelMapa(html) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Corrige el tamaño del mapa al cambiar pantalla.
 function ajustarMapa() {
   if (estadoMapa.mapa) estadoMapa.mapa.invalidateSize();
 }
