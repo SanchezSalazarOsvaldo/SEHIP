@@ -467,3 +467,176 @@ router.post('/proyectos/:id/mitigacion', cargarProyecto, async (req, res) => {
   await responderProyecto(res, p.id_proyecto, req.session.usuario.id,
     obra.dentro_de_capacidad ? calc.MENSAJES.dentroDeCapacidad : calc.MENSAJES.excedeCapacidad);
 });
+
+
+
+
+
+
+
+// Atiende una accion o consulta de este modulo.
+router.post('/proyectos/:id/reportes', cargarProyecto, async (req, res) => {
+  const datos = req.body || {};
+  const idUsuario = req.session.usuario.id;
+  
+  if (!calc.datosCompletosParaReporte(aProyecto(req.fila, idUsuario))) {
+    return res.status(400).json({ error: calc.MENSAJES.reporteIncompleto });
+  }
+
+  
+  
+  const contenido = Buffer.from(String(datos.contenidoBase64 || ''), 'base64');
+  const esPdf = contenido.subarray(0, 4).toString() === '%PDF';
+  if (!esPdf || contenido.length < 1 || contenido.length > calc.TAMANO_MAXIMO_REPORTE) {
+    return res.status(400).json({ error: calc.MENSAJES.reporteFallido });
+  }
+
+  
+  const { rows: usados } = await db.query(
+    `SELECT COALESCE(SUM(OCTET_LENGTH(r.contenido)), 0) AS total
+       FROM reporte_pdf r
+       JOIN proyecto p ON p.id_proyecto = r.id_proyecto
+      WHERE ${condicionAcceso(1)} AND r.fecha_generacion > LOCALTIMESTAMP - INTERVAL '1 day'`,
+    [idUsuario]
+  );
+  if (usados[0].total + contenido.length > BYTES_REPORTES_POR_DIA) {
+    return res.status(429).json({ error: calc.MENSAJES.limiteReportes });
+  }
+
+  const p = req.fila;
+  const { rows: guardado } = await db.query(
+    
+    `WITH r AS (INSERT INTO reporte_pdf (id_proyecto, contenido) VALUES ($1, $2) RETURNING *)
+     SELECT ${COLUMNAS_REPORTE} FROM r`,
+    [p.id_proyecto, contenido]
+  );
+  await responderProyecto(res, p.id_proyecto, idUsuario, `Reporte técnico descargado: ${guardado[0].nombre_archivo}`);
+});
+
+
+
+
+
+
+// Atiende una accion o consulta de este modulo.
+router.delete('/proyectos/:id', cargarProyecto, soloCreador, async (req, res) => {
+  await db.query(
+    `WITH reportes AS (DELETE FROM reporte_pdf WHERE id_proyecto = $1),
+          simulaciones AS (DELETE FROM simulacion_mitigacion WHERE id_proyecto = $1)
+     DELETE FROM proyecto WHERE id_proyecto = $1`,
+    [req.fila.id_proyecto]
+  );
+  res.json({ mensaje: calc.MENSAJES.proyectoEliminado });
+});
+
+
+// Atiende una accion o consulta de este modulo.
+router.delete('/proyectos/:id/simulaciones/:idSimulacion', cargarProyecto, async (req, res) => {
+  const p = req.fila;
+  const idSimulacion = req.params.idSimulacion;
+  
+  const resultado = calc.identificadorValido(idSimulacion)
+    ? await db.query('DELETE FROM simulacion_mitigacion WHERE id_simulacion = $1 AND id_proyecto = $2',
+      [Number(idSimulacion), p.id_proyecto])
+    : { rowCount: 0 };
+  if (resultado.rowCount === 0) return res.status(404).json({ error: calc.MENSAJES.simulacionNoEncontrada });
+  await responderProyecto(res, p.id_proyecto, req.session.usuario.id, calc.MENSAJES.simulacionEliminada);
+});
+
+
+// Atiende una accion o consulta de este modulo.
+router.delete('/proyectos/:id/reportes/:idReporte', cargarProyecto, async (req, res) => {
+  const p = req.fila;
+  const idReporte = req.params.idReporte;
+  
+  const resultado = calc.identificadorValido(idReporte)
+    ? await db.query('DELETE FROM reporte_pdf WHERE id_reporte = $1 AND id_proyecto = $2',
+      [Number(idReporte), p.id_proyecto])
+    : { rowCount: 0 };
+  if (resultado.rowCount === 0) return res.status(404).json({ error: calc.MENSAJES.reporteNoEncontrado });
+  await responderProyecto(res, p.id_proyecto, req.session.usuario.id, calc.MENSAJES.reporteEliminado);
+});
+
+
+// Atiende una accion o consulta de este modulo.
+router.get('/reportes/:id/descargar', async (req, res) => {
+  if (!calc.identificadorValido(req.params.id)) {
+    return res.status(404).json({ error: calc.MENSAJES.proyectoNoEncontrado });
+  }
+  const { rows: filas } = await db.query(
+    `SELECT ${COLUMNAS_REPORTE}, r.contenido
+       FROM reporte_pdf r
+       JOIN proyecto p ON p.id_proyecto = r.id_proyecto
+      WHERE r.id_reporte = $1 AND ${condicionAcceso(2)}`,
+    [Number(req.params.id), req.session.usuario.id]
+  );
+  if (filas.length === 0) {
+    return res.status(404).json({ error: calc.MENSAJES.proyectoNoEncontrado });
+  }
+  
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filas[0].nombre_archivo}"`);
+  res.send(filas[0].contenido);
+});
+
+
+
+
+// Atiende una accion o consulta de este modulo.
+router.post('/proyectos/:id/miembros', cargarProyecto, soloCreador, async (req, res) => {
+  const correo = String((req.body || {}).correo ?? '').trim();
+  if (!calc.correoValido(correo)) return res.status(400).json({ error: calc.MENSAJES.correoInvalido });
+
+  const { rows: cuentas } = await db.query(
+    `SELECT u.id_usuario, u.nombre
+       FROM usuario u
+       JOIN rol r ON r.id_rol = u.id_rol
+      WHERE LOWER(u.correo) = LOWER($1) AND u.activo AND r.nombre = $2`,
+    [correo, calc.ROL_INGENIERO]
+  );
+  if (cuentas.length === 0) return res.status(404).json({ error: calc.MENSAJES.ingenieroNoEncontrado });
+  
+  const invitado = cuentas[0];
+  const p = req.fila;
+  if (invitado.id_usuario === p.id_usuario) return res.status(400).json({ error: calc.MENSAJES.ingenieroYaMiembro });
+
+  const { rows: conteo } = await db.query(
+    
+    'SELECT COUNT(*) AS total FROM proyecto_ingeniero WHERE id_proyecto = $1', [p.id_proyecto]);
+  if (conteo[0].total >= calc.MAXIMO_MIEMBROS) return res.status(400).json({ error: calc.MENSAJES.limiteMiembros });
+
+  
+  const resultado = await db.query(
+    `INSERT INTO proyecto_ingeniero (id_proyecto, id_usuario) VALUES ($1, $2)
+     ON CONFLICT (id_proyecto, id_usuario) DO NOTHING`,
+    [p.id_proyecto, invitado.id_usuario]
+  );
+  if (resultado.rowCount === 0) return res.status(400).json({ error: calc.MENSAJES.ingenieroYaMiembro });
+  res.status(201);
+  await responderProyecto(res, p.id_proyecto, req.session.usuario.id,
+    `${invitado.nombre} ahora puede trabajar en el proyecto`);
+});
+
+
+// Atiende una accion o consulta de este modulo.
+router.delete('/proyectos/:id/miembros/:idUsuario', cargarProyecto, async (req, res) => {
+  const p = req.fila;
+  const idSesion = req.session.usuario.id;
+  
+  const idQuitar = calc.identificadorValido(req.params.idUsuario) ? Number(req.params.idUsuario) : null;
+  if (idQuitar === p.id_usuario) return res.status(400).json({ error: calc.MENSAJES.creadorNoSeQuita });
+  if (idSesion !== p.id_usuario && idQuitar !== idSesion) {
+    return res.status(403).json({ error: calc.MENSAJES.soloCreador });
+  }
+
+  const resultado = idQuitar === null ? { rowCount: 0 } : await db.query(
+    'DELETE FROM proyecto_ingeniero WHERE id_proyecto = $1 AND id_usuario = $2', [p.id_proyecto, idQuitar]);
+  if (resultado.rowCount === 0) return res.status(404).json({ error: calc.MENSAJES.miembroNoEncontrado });
+
+  
+  if (idQuitar === idSesion) return res.json({ mensaje: calc.MENSAJES.salioDelProyecto });
+  await responderProyecto(res, p.id_proyecto, idSesion, calc.MENSAJES.miembroQuitado);
+});
+
+
+module.exports = router;
