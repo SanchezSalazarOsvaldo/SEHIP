@@ -1,4 +1,4 @@
-// Carga las variables de entorno para usar datos privados.
+// Lee las variables privadas antes de iniciar.
 const fs = require('fs');
 const path = require('path');
 
@@ -16,7 +16,7 @@ if (fs.existsSync(ARCHIVO_ENV)) {
     const indice = texto.indexOf('=');
     const nombre = texto.slice(0, indice).trim();
     const valor = texto.slice(indice + 1).trim().replace(/^["']|["']$/g, '');
-    // Las variables del sistema tienen prioridad sobre el archivo.
+    // Aplica esta comprobación antes de continuar.
     if (process.env[nombre] === undefined) process.env[nombre] = valor;
   });
 }
