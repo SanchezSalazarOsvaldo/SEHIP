@@ -1,4 +1,4 @@
-// Permite cambiar y recuperar la contraseña.
+// Permite cambiar o recuperar la contraseña.
 const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -19,7 +19,7 @@ const aleatorios = (n) => Array.from(crypto.randomBytes(n));
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Cambia la contraseña actual.
 router.post('/contrasena', async (req, res) => {
   const usuario = req.session.usuario;
   if (!usuario) return res.status(401).json({ error: 'Debe iniciar sesión' });
@@ -67,7 +67,7 @@ router.post('/contrasena', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Solicita un código de recuperación.
 router.post('/recuperacion/solicitar', limiteSolicitudCodigo, async (req, res) => {
   const correo = String((req.body || {}).correo ?? '').trim();
   if (!calc.correoValido(correo)) return res.status(400).json({ error: calc.MENSAJES.correoInvalido });
@@ -112,7 +112,7 @@ router.post('/recuperacion/solicitar', limiteSolicitudCodigo, async (req, res) =
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Comprueba el código y cambia la contraseña.
 router.post('/recuperacion/restablecer', limiteRestablecer, async (req, res) => {
   const datos = req.body || {};
   const correo = String(datos.correo ?? '').trim();
