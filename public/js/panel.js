@@ -1,6 +1,5 @@
-
-// Por qué así: un solo objeto estado guarda lo que la pantalla necesita y pintarTodo() redibuja todo a partir de él; así la pantalla nunca muestra datos mezclados.
-// Por qué no modificar la pantalla en cada evento por separado: es fácil que una parte quede desactualizada. escapar() evita inyección de HTML con nombres escritos por el usuario.
+// Por qué así: un solo objeto estado guarda lo que la pantalla necesita y pintarTodo() redibuja todo a partir de él
+// Por qué no modificar la pantalla en cada evento por separado: es fácil que una parte quede desactualizada. escapar() evita inyeccióncon nombres escritos por el usuario.
 // Panel del ingeniero civil. Las pestañas (Proyectos, Cálculo, Mitigación y Reporte) comparten un mapa
 // siempre visible donde se dibuja la simulación del proyecto activo.
 // Funciona con un objeto estado: cada respuesta del servidor actualiza estado y después pintarTodo()
@@ -24,7 +23,6 @@ const estado = {
   pestana: 'proyectos'
 };
 
-// Texto de ayuda que aparece sobre el mapa según la pestaña abierta.
 const INSTRUCCIONES_MAPA = {
   proyectos: {
     nuevo: 'Haga clic en el mapa para colocar el punto del nuevo proyecto. Puede arrastrar el pin para ajustarlo.',
@@ -61,7 +59,7 @@ function numeroCorto(valor, maximo = 2) {
   return Number(valor).toLocaleString('es-MX', { maximumFractionDigits: maximo });
 }
 
-// Escribe un resultado (con su unidad) en el elemento indicado.
+// Escribe un resultado en el elemento indicado.
 function pintarMetrica(id, valor, decimales, unidad = '') {
   const elemento = $(id);
   const texto = numero(valor, decimales);
@@ -95,12 +93,12 @@ function snackbar(texto) {
   temporizadorSnackbar = setTimeout(() => caja.classList.add('oculto'), 4000);
 }
 
-// Clase CSS de la etiqueta de estado: verde si está Calculado.
+// Clase CSS de la etiqueta de estado: verde si está Calculado, gris si está En proceso.
 function claseEstado(estadoProyecto) {
   return estadoProyecto === 'Calculado' ? 'chip-calculado' : 'chip-proceso';
 }
 
-// Busca el id de una alcaldía por su nombre
+// Busca el id de una alcaldía por su nombre (el mapa trabaja con nombres y el servidor con ids).
 function idAlcaldiaPorNombre(nombre) {
   const alcaldia = estado.alcaldias.find((a) => a.nombre === nombre);
   return alcaldia ? alcaldia.id : '';
@@ -133,7 +131,7 @@ function escenario(p, caudal, permitido) {
   };
 }
 
-// Datos de la obra que se está colocando si la capacidad y la ubicación son válidas. El tipo
+// Datos de la obra que se está colocando (vista previa) si la capacidad y la ubicación son válidas. El tipo
 // de obra no cambia el cálculo: solo se exige al guardar la simulación.
 function obraEnPreparacion() {
   const capacidad = leerCapacidad($('capacidad').value);
@@ -165,7 +163,8 @@ function modeloSimulacion() {
   modelo.actual = modelo.despues || modelo.antes;
   return modelo;
 }
-// El semáforo y el medidor solo dibujan resultados que ya calcularon las fórmulas de validaciones.js; panel.js no repite fórmulas.
+
+//El semáforo y el medidor solo dibujan resultados que ya calcularon las fórmulas de validaciones.js; panel.js no repite fórmulas.
 // Por qué no calcular aquí con otra fórmula: si el navegador y el servidor calcularan distinto, mostrarían números diferentes.
 // ---------- Semáforo (tarjetas) ----------
 
@@ -208,7 +207,7 @@ function posicionMedidor(porcentaje) {
   return Math.min(100, Math.max(0, ((porcentaje ?? ESCALA_MEDIDOR) / ESCALA_MEDIDOR) * 100));
 }
 
-// Marcas del medidor para el modelo: sin obra y, si existe, con la obra.
+// Marcas del medidor para el modelo: sin obra y, si existe, con la obra (guardada o en vista previa).
 function marcasMedidor(modelo, incluirObra = true) {
   if (!modelo.antes) return [];
   const marcas = [{ tipo: 'antes', etiqueta: 'Sin obra', evaluacion: modelo.antes.evaluacion }];
@@ -309,7 +308,7 @@ async function cargarIntensidades(idAlcaldia) {
   if (estado.proyecto) pintarGraficaIntensidad(estado.proyecto);
 }
 
-// Gráfica de barras con la intensidad de cada período de retorno
+// Gráfica de barras con la intensidad de cada período de retorno; la barra elegida se resalta.
 function pintarGraficaIntensidad(p) {
   const caja = $('grafica-intensidad');
   const valores = estado.intensidades.idAlcaldia === p.idAlcaldia ? estado.intensidades.valores : null;
@@ -362,13 +361,17 @@ function pintarDesarrolloCaudal(p, permitido) {
     </div>`;
 }
 
+// ---------- Recomendación de capacidad ----------
+
+// Botón que copia una capacidad recomendada al formulario (solo si no pasa de 50,000 m³).
 function botonUsarCapacidad(capacidad) {
   return capacidad <= 50000
     ? `<button type="button" class="boton boton-contorno boton-chico usar-capacidad" data-capacidad="${capacidad}">Usar</button>`
     : '';
 }
 
-// Recomienda la capacidad de obra necesaria para bajar a amarillo y a verde.
+// Recomienda la capacidad de obra necesaria para bajar a amarillo y a verde, según la eficiencia de
+// la ubicación elegida.
 function pintarRecomendacion(p, modelo) {
   const caja = $('recomendacion-mitigacion');
   if (!modelo.antes) {
@@ -398,3 +401,827 @@ function pintarRecomendacion(p, modelo) {
     </ul>
     <span class="ayuda">Capacidad = (Qpico − Qobjetivo) × 3,600 s / eficiencia, con la obra ${ubicacion}.</span>${fueraDeRango}</div>`;
 }
+
+//la barra deslizante solo cambia el campo de capacidad y vuelve a pintar
+// Por qué no guardar en cada movimiento: serían decenas de peticiones por segundo y se llenaría la base de simulaciones. El botón de invitar solo aparece si esCreador es true, pero el servidor vuelve a revisarlo.
+// ---------- Mapa ----------
+
+// Renglón etiqueta–valor del panel de datos que aparece sobre el mapa.
+function filaPanel(etiqueta, valor) {
+  return `<div class="fila"><span>${etiqueta}</span><b>${valor}</b></div>`;
+}
+
+// Contenido del panel de datos dentro del mapa.
+function htmlPanelMapa(p, modelo) {
+  if (!p) {
+    if (!estado.punto) return '';
+    return `<h4>Nuevo proyecto</h4>
+      ${filaPanel('Alcaldía', escapar(estado.punto.alcaldia))}
+      ${filaPanel('Coordenadas', `${estado.punto.latitud.toFixed(5)}, ${estado.punto.longitud.toFixed(5)}`)}
+      <div class="nota">Escriba el nombre y guarde el proyecto para empezar la simulación.</div>`;
+  }
+  let html = `<h4>${escapar(p.nombre)}</h4>${filaPanel('Alcaldía', escapar(p.alcaldia))}`;
+  if (!modelo.antes) {
+    const pasos = [
+      ['Superficies y coeficiente C', p.coeficiente != null],
+      ['Intensidad de lluvia', p.intensidad != null],
+      ['Caudal pico', p.caudalPico != null]
+    ];
+    return `${html}<div class="separador"></div>
+      <div class="nota">Para ver la zona afectada complete en la pestaña Cálculo:</div>
+      ${pasos.map(([t, ok]) => filaPanel(t, ok ? '✓' : 'pendiente')).join('')}`;
+  }
+
+  const actual = modelo.previa || modelo.actual;
+  const e = actual.evaluacion;
+  html += `<div class="separador"></div>
+    <div class="etiqueta-nivel" style="--color-nivel:${COLORES_SEMAFORO[e.nivel]}">${e.etiqueta} · ${e.porcentaje ?? '-'} %</div>
+    ${htmlMedidor(marcasMedidor(modelo, estado.pestana === 'mitigacion' || Boolean(modelo.despues)), true)}
+    ${filaPanel('Caudal pico (sin obra)', `${numero(p.caudalPico, 3)} m³/s`)}
+    ${filaPanel('Descarga permitida', `${numero(modelo.permitido, 3)} m³/s`)}
+    ${filaPanel('Zona sin obra', `${numero(modelo.antes.radio, 1)} m`)}`;
+
+  const conObra = modelo.previa || modelo.despues;
+  if (conObra) {
+    const o = conObra.obra;
+    const reduccion = Math.round((1 - conObra.area / modelo.antes.area) * 100);
+    const reduccionCaudal = Math.round((1 - conObra.caudal / modelo.antes.caudal) * 100);
+    html += `<div class="separador"></div>
+      <div class="nota">${modelo.previa ? 'Vista previa (sin guardar)' : 'Con la obra guardada'}:
+        ${escapar(o.tipoObra)}, ${numero(o.capacidad, 2)} m³, eficiencia ${Math.round(o.eficiencia * 100)} %</div>
+      ${filaPanel('Caudal ajustado', `${numero(conObra.caudal, 3)} m³/s`)}
+      <div class="fila"><span>Caudal</span><b class="mejora">−${reduccionCaudal} %</b></div>
+      ${filaPanel('Zona con obra', `${numero(conObra.radio, 1)} m`)}
+      <div class="fila"><span>Área afectada</span><b class="mejora">−${reduccion} %</b></div>`;
+  }
+  return html;
+}
+
+// Redibuja el mapa a partir del estado: un solo pin y la simulación del proyecto activo.
+function pintarMapa(opciones = {}) {
+  const p = estado.proyecto;
+  const modelo = modeloSimulacion();
+
+  if (!p) {
+    limpiarSimulacion();
+    ocultarGuiaObra();
+    if (estado.punto) {
+      mostrarPin(estado.punto.latitud, estado.punto.longitud, {
+        color: COLORES_SEMAFORO.nuevo, etiqueta: '', arrastrable: true
+      });
+      resaltarAlcaldia(estado.punto.alcaldia);
+    } else {
+      quitarPin();
+      resaltarAlcaldia(null);
+    }
+    actualizarPanelMapa(htmlPanelMapa(null, modelo));
+    return modelo;
+  }
+
+  const mostrado = modelo.previa || modelo.actual;
+  const nivel = mostrado ? mostrado.evaluacion.nivel : 'ninguno';
+  mostrarPin(p.latitud, p.longitud, {
+    color: COLORES_SEMAFORO[nivel], etiqueta: '', arrastrable: estado.pestana === 'proyectos'
+  });
+  resaltarAlcaldia(p.alcaldia);
+
+  const conObra = modelo.previa || modelo.despues;
+  dibujarSimulacion({
+    centro: [p.latitud, p.longitud],
+    radioPredio: p.superficieTotal != null ? radioPredio(p.superficieTotal) : null,
+    zonaAntes: conObra ? { radio: modelo.antes.radio, nivel: modelo.antes.evaluacion.nivel } : null,
+    zonaActual: modelo.antes
+      ? { radio: (conObra || modelo.antes).radio, nivel: (conObra || modelo.antes).evaluacion.nivel }
+      : null,
+    obra: conObra ? conObra.obra : (estado.obra && estado.pestana === 'mitigacion'
+      ? { ...estado.obra, tipoObra: $('tipo-obra').value || 'Pozo de Infiltración', capacidad: 0 }
+      : null),
+    previa: Boolean(modelo.previa),
+    obraPrevia: Boolean(estado.obra && estado.pestana === 'mitigacion')
+  });
+  if (estado.pestana === 'mitigacion' && modelo.antes) {
+    mostrarGuiaObra([p.latitud, p.longitud], modelo.antes.radio);
+  } else {
+    ocultarGuiaObra();
+  }
+  actualizarPanelMapa(htmlPanelMapa(p, modelo));
+  if (opciones.encuadrar) encuadrarZona();
+  return modelo;
+}
+
+// ---------- Pestañas ----------
+
+// Cambia de pestaña: marca el botón activo, muestra su contenido y actualiza la ayuda del mapa.
+function mostrarPestana(nombre) {
+  estado.pestana = nombre;
+  document.querySelectorAll('.pestana').forEach((boton) => {
+    boton.classList.toggle('activa', boton.dataset.pestana === nombre);
+  });
+  document.querySelectorAll('.panel-pestana').forEach((panel) => {
+    panel.classList.toggle('oculto', panel.id !== `pestana-${nombre}`);
+  });
+  const instruccion = INSTRUCCIONES_MAPA[nombre];
+  $('mapa-instruccion').textContent = typeof instruccion === 'string'
+    ? instruccion
+    : instruccion[estado.proyecto ? 'activo' : 'nuevo'];
+  $('mapa-seleccion').classList.add('oculto');
+  if (nombre !== 'mitigacion') limpiarObra(false);
+  ajustarMapa();
+  if (estado.proyecto) {
+    pintarTodo({ encuadrar: (nombre === 'calculo' || nombre === 'mitigacion') && estado.proyecto.caudalPico != null });
+  }
+}
+
+// ---------- Equipo del proyecto ----------
+
+// Lista del creador y los ingenieros invitados. El creador ve el formulario para invitar y el botón para
+// quitar a cada invitado; un invitado ve el botón para salir del proyecto.
+function pintarEquipo() {
+  const p = estado.proyecto;
+  $('form-invitar').classList.toggle('oculto', !p.esCreador);
+  $('lista-miembros').innerHTML = estado.miembros.map((m) => {
+    let accion = '';
+    if (p.esCreador && !m.esCreador) accion = botonEliminar('miembro', m.id, `a ${m.nombre} del proyecto`);
+    if (!p.esCreador && m.id === estado.usuario.id) accion = botonEliminar('salir', m.id, 'mi participación en el proyecto');
+    return `<li class="fila-miembro">
+      <span class="miembro-datos"><strong>${escapar(m.nombre)}</strong><span>${escapar(m.correo)}</span></span>
+      ${m.esCreador ? '<span class="chip">Creador</span>' : ''}${accion}</li>`;
+  }).join('');
+}
+
+// ---------- Barra deslizante de la capacidad de la obra ----------
+
+// Ajusta el máximo de la barra a 1.5 veces la capacidad que lleva el proyecto a riesgo bajo con la
+// eficiencia de la obra elegida (mínimo 100 m³ y máximo 50,000 m³) y la sincroniza con el campo de texto.
+function ajustarBarraCapacidad(p, modelo) {
+  const barra = $('barra-capacidad');
+  const eficiencia = estado.obra ? estado.obra.eficiencia : 1;
+  let maximo = 100;
+  if (modelo.antes && modelo.permitido != null) {
+    const paraVerde = capacidadNecesaria(p.caudalPico, limitesSemaforo(modelo.permitido).verde, eficiencia);
+    maximo = Math.min(50000, Math.max(100, Math.ceil(paraVerde * 1.5 / 10) * 10));
+  }
+  if (document.activeElement !== barra) {
+    barra.max = maximo;
+    barra.step = maximo > 1000 ? 10 : 1;
+  }
+  const capacidad = leerCapacidad($('capacidad').value);
+  if (document.activeElement !== barra) barra.value = capacidad ?? 0;
+  barra.disabled = !modelo.antes;
+  $('texto-barra').textContent = !modelo.antes
+    ? 'Calcule el caudal pico para usar la barra.'
+    : estado.obra
+      ? 'Deslice la barra: la zona afectada, el caudal y el semáforo cambian al momento (vista previa sin guardar).'
+      : 'Coloque la obra en el mapa y deslice la barra para ver cómo cambia la zona afectada.';
+}
+
+// ---------- RF-WEB-03: historial ----------
+
+// RF-WEB-03: pide una página del historial y dibuja la lista; el botón de eliminar solo aparece en
+// los proyectos propios y los compartidos llevan el nombre de su creador.
+async function cargarHistorial(pagina = estado.pagina) {
+  const resultado = await listarProyectos(pagina);
+  const lista = $('lista-proyectos');
+  lista.innerHTML = '';
+  $('msg-historial').innerHTML = '';
+
+  if (!resultado.ok) {
+    mostrarMensaje('msg-historial', 'error', resultado.error);
+    $('paginacion').classList.add('oculto');
+    return;
+  }
+  estado.pagina = resultado.pagina;
+
+  resultado.proyectos.forEach((p) => {
+    const activo = estado.proyecto && estado.proyecto.id === p.id;
+    const item = document.createElement('li');
+    item.className = 'fila-proyecto';
+    item.innerHTML = `
+      <button type="button" class="item-proyecto ${activo ? 'activo' : ''}" data-id="${p.id}">
+        <span class="item-nombre">#${p.id} · ${escapar(p.nombre)}</span>
+        <span class="item-detalle">${escapar(p.alcaldia)} · ${p.fechaCreacion}</span>
+        <span class="chip ${claseEstado(p.estado)}">${p.estado}</span>
+        ${p.esCreador ? '' : `<span class="item-compartido">Compartido por ${escapar(p.creador)}</span>`}
+      </button>
+      ${p.esCreador ? botonEliminar('proyecto', p.id, `el proyecto ${p.nombre}`) : ''}`;
+    lista.appendChild(item);
+  });
+
+  $('paginacion').classList.toggle('oculto', resultado.totalPaginas <= 1);
+  $('texto-pagina').textContent = `Página ${resultado.pagina} de ${resultado.totalPaginas}`;
+  $('pagina-anterior').disabled = resultado.pagina <= 1;
+  $('pagina-siguiente').disabled = resultado.pagina >= resultado.totalPaginas;
+}
+// ---------- Proyecto activo ----------
+
+// Guarda en el estado los datos devueltos por una operación y redibuja todo.
+function cargarDatosProyecto(datos) {
+  const cambioDeProyecto = !estado.proyecto || estado.proyecto.id !== datos.proyecto.id;
+  const teniaZona = estado.proyecto && estado.proyecto.caudalPico != null;
+  estado.proyecto = datos.proyecto;
+  estado.simulaciones = datos.simulaciones || [];
+  estado.reportes = datos.reportes || [];
+  estado.miembros = datos.miembros || [];
+  const permitido = caudalPermitidoProyecto(estado.proyecto);
+  estado.simulacionVigente = estado.simulaciones.find((s) => simulacionVigente(s, estado.proyecto, permitido)) || null;
+  document.body.classList.add('hay-proyecto');
+  if (cambioDeProyecto) limpiarObra(false);
+
+  pintarTodo({ encuadrar: cambioDeProyecto || (!teniaZona && estado.proyecto.caudalPico != null) });
+  if (cambioDeProyecto && estado.proyecto.caudalPico == null) {
+    centrarEn(estado.proyecto.latitud, estado.proyecto.longitud);
+  }
+}
+
+// Pinta todas las pestañas y el mapa con el estado actual.
+function pintarTodo(opcionesMapa = {}) {
+  const p = estado.proyecto;
+  const modelo = pintarMapa(opcionesMapa);
+  if (!p) return;
+
+  // Barra del proyecto activo
+  $('p-nombre').textContent = p.nombre;
+  $('p-estado').className = `chip ${claseEstado(p.estado)}`;
+  $('p-estado').textContent = p.estado;
+  $('p-id').textContent = `ID ${p.id}`;
+  $('p-alcaldia').textContent = p.alcaldia;
+  $('p-fecha').textContent = p.fechaCreacion;
+  $('p-coordenadas').textContent = `${p.latitud.toFixed(6)}, ${p.longitud.toFixed(6)}`;
+  $('p-semaforo').textContent = modelo.actual ? modelo.actual.evaluacion.etiqueta : '';
+  $('p-semaforo').style.setProperty('--color-nivel', modelo.actual ? COLORES_SEMAFORO[modelo.actual.evaluacion.nivel] : '');
+
+  // Pestaña Proyectos
+  $('ubicacion-activa').querySelector('span').textContent =
+    `${p.latitud.toFixed(6)}, ${p.longitud.toFixed(6)} · ${p.alcaldia}`;
+  $('texto-creador').textContent = p.esCreador ? '' : `Proyecto compartido por ${p.creador}.`;
+  pintarEquipo();
+
+  // Pestaña Cálculo
+  pintarMetrica('m-superficie', p.superficieTotal, 2, ' m²');
+  $('m-superficie-detalle').textContent = p.superficieTotal == null ? ''
+    : `Permeable ${numero(p.superficiePermeable, 2)} · Impermeable ${numero(p.superficieImpermeable, 2)}`;
+  pintarMetrica('m-coeficiente', p.coeficiente, 2);
+  pintarMetrica('m-intensidad', p.intensidad, 2, ' mm/h');
+  $('m-periodo').textContent = p.periodoRetorno ? `Período de retorno: ${p.periodoRetorno} años` : '';
+  pintarMetrica('m-caudal', p.caudalPico, 3, ' m³/s');
+  pintarMetrica('m-permitido', modelo.permitido, 3, ' m³/s');
+  pintarMetrica('m-zona', modelo.antes ? modelo.antes.radio : null, 1, ' m');
+  $('m-zona-detalle').textContent = modelo.antes ? `Radio sin obra · ${numero(modelo.antes.area, 0)} m²` : '';
+  if (document.activeElement !== $('ap') && document.activeElement !== $('ai')) {
+    $('ap').value = p.superficiePermeable ?? '';
+    $('ai').value = p.superficieImpermeable ?? '';
+  }
+  $('periodo').value = p.periodoRetorno ?? '';
+  pintarProgreso(p);
+  pintarVistaCoeficiente();
+  pintarGraficaIntensidad(p);
+  pintarDesarrolloCaudal(p, modelo.permitido);
+  $('medidor-calculo').innerHTML = htmlMedidor(marcasMedidor(modelo, false));
+  $('semaforo-calculo').innerHTML = htmlSemaforo(modelo.antes, 'Caudal pico');
+  $('accion-mitigar').innerHTML = modelo.antes && modelo.antes.evaluacion.nivel !== 'verde'
+    ? '<button type="button" class="boton boton-contorno" id="ir-mitigacion">Simular obra de mitigación</button>'
+    : '';
+
+  // Pestaña Mitigación
+  pintarMetrica('mit-caudal-pico', p.caudalPico, 3, ' m³/s');
+  $('medidor-mitigacion').innerHTML = htmlMedidor(marcasMedidor(modelo));
+  $('semaforo-antes').innerHTML = htmlSemaforo(modelo.antes, 'Caudal pico');
+  pintarDespues(modelo);
+  pintarVistaPrevia(modelo);
+  pintarRecomendacion(p, modelo);
+  ajustarBarraCapacidad(p, modelo);
+  pintarSimulaciones();
+
+  // Pestaña Reporte
+  pintarChecklist(p);
+  pintarReportes(estado.reportes);
+}
+
+// Tarjeta con el resultado de la última simulación guardada.
+function pintarDespues(modelo) {
+  const ultima = estado.simulaciones[0];
+  if (modelo.previa) {
+    $('titulo-despues').textContent = 'Con la obra (vista previa, sin guardar)';
+    $('semaforo-despues').innerHTML = htmlSemaforo(modelo.previa, 'Caudal ajustado');
+  } else if (modelo.despues) {
+    const o = modelo.despues.obra;
+    $('titulo-despues').textContent = `Con la obra guardada: ${o.tipoObra}, ${numero(o.capacidad, 2)} m³`;
+    $('semaforo-despues').innerHTML = htmlSemaforo(modelo.despues, 'Caudal ajustado');
+  } else {
+    $('titulo-despues').textContent = 'Con la obra';
+    $('semaforo-despues').innerHTML = ultima
+      ? '<p class="texto-vacio">La última simulación quedó desactualizada: con los datos actuales del proyecto la obra queda fuera de la zona afectada. Simule de nuevo.</p>'
+      : '<p class="texto-vacio">Sin calcular. Coloque una obra en el mapa para ver cómo cambia el riesgo.</p>';
+  }
+}
+
+// Texto de vista previa: cómo cambiarían el caudal y la zona con la obra que se está preparando.
+function pintarVistaPrevia(modelo) {
+  const caja = $('vista-previa');
+  if (!modelo.previa) {
+    caja.innerHTML = '';
+    return;
+  }
+  const antes = modelo.antes;
+  const previa = modelo.previa;
+  caja.innerHTML = `<div class="vista-previa">
+    <strong>Vista previa:</strong> el caudal pasa de ${numero(antes.caudal, 3)} a <b>${numero(previa.caudal, 3)} m³/s</b>
+    y la zona afectada de ${numero(antes.radio, 1)} m a <b>${numero(previa.radio, 1)} m</b> de radio
+    → ${chipSemaforo(previa.evaluacion)}. Pulse <b>Simular mitigación</b> para guardarla.</div>`;
+}
+
+// Tabla de simulaciones guardadas; las que ya no corresponden a los datos actuales se marcan como
+// desactualizadas.
+function pintarSimulaciones() {
+  const cuerpo = $('tabla-simulaciones');
+  if (estado.simulaciones.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="8" class="tabla-vacia">Sin calcular</td></tr>';
+    return;
+  }
+  const permitido = caudalPermitidoProyecto(estado.proyecto);
+  cuerpo.innerHTML = estado.simulaciones.map((s) => {
+    const vigente = simulacionVigente(s, estado.proyecto, permitido);
+    return `
+    <tr class="${vigente ? '' : 'fila-desactualizada'}">
+      <td>${escapar(s.fechaHora)}</td>
+      <td>${escapar(s.tipoObra)}</td>
+      <td class="num">${numero(s.capacidad, 2)}</td>
+      <td class="num">${s.eficiencia != null ? `${Math.round(s.eficiencia * 100)} %` : '-'}</td>
+      <td class="num">${numero(s.caudalAjustado, 3) ?? '-'}</td>
+      <td class="num">${numero(s.caudalPermitido, 3) ?? '-'}</td>
+      <td>${vigente ? chipSemaforo(evaluarSemaforo(s.caudalAjustado, s.caudalPermitido))
+        : '<span class="estado-desactualizada">Desactualizada</span>'}</td>
+      <td>${botonEliminar('simulacion', s.id, `la simulación del ${s.fechaHora}`)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Lista de requisitos del reporte (RF-WEB-08) con los que ya se cumplieron.
+function pintarChecklist(p) {
+  const requisitos = [
+    ['Nombre y alcaldía del proyecto', Boolean(p.nombre && p.idAlcaldia)],
+    ['Ubicación (punto en el mapa)', p.latitud != null && p.longitud != null],
+    ['Superficies permeable e impermeable', p.superficieTotal != null],
+    ['Coeficiente de escurrimiento', p.coeficiente != null],
+    ['Intensidad de lluvia y período de retorno', p.intensidad != null],
+    ['Caudal pico', p.caudalPico != null],
+    ['Simulación de mitigación vigente (opcional)', estado.simulacionVigente != null]
+  ];
+  $('checklist-reporte').innerHTML = requisitos.map(([texto, listo]) => `
+    <li class="${listo ? 'listo' : 'pendiente'}">
+      <svg class="icono"><use href="#${listo ? 'i-check' : 'i-cruz'}"/></svg>
+      ${texto}
+    </li>`).join('');
+}
+
+// Historial de reportes del proyecto con su fecha, tamaño y botones de descargar y eliminar.
+function pintarReportes(reportes) {
+  const lista = $('lista-reportes');
+  if (!reportes || reportes.length === 0) {
+    lista.innerHTML = '<li class="texto-vacio">Aún no se han generado reportes para este proyecto.</li>';
+    return;
+  }
+  lista.innerHTML = reportes.map((r) => `
+    <li>
+      <div>
+        <div class="reporte-nombre">${escapar(r.nombreArchivo)}</div>
+        <div class="reporte-detalle">${escapar(r.fechaGeneracion)} · ${numero(r.tamanoBytes / 1024, 1)} KB</div>
+      </div>
+      <div class="acciones-reporte">
+        <a class="enlace-descarga" href="${r.url}" download="${escapar(r.nombreArchivo)}">
+          <svg class="icono"><use href="#i-descarga"/></svg>Descargar
+        </a>
+        ${botonEliminar('reporte', r.id, `el reporte ${r.nombreArchivo}`)}
+      </div>
+    </li>`).join('');
+}
+
+// ---------- Eliminar proyecto, simulación o reporte ----------
+
+// Botón con icono de papelera. tipo: 'proyecto', 'simulacion' o 'reporte'.
+function botonEliminar(tipo, id, descripcion) {
+  return `<button type="button" class="boton-eliminar" data-eliminar="${tipo}" data-id="${id}"
+    title="Eliminar ${escapar(descripcion)}" aria-label="Eliminar ${escapar(descripcion)}">
+    <svg class="icono"><use href="#i-basura"/></svg><span>Confirmar</span></button>`;
+}
+
+// El primer clic pide confirmación durante 4 segundos (el botón cambia a "Confirmar"); el segundo elimina.
+let temporizadorEliminar = null;
+// Primer clic en una papelera: el botón cambia a 'Confirmar' durante 4 segundos.
+function confirmarEliminacion(boton) {
+  clearTimeout(temporizadorEliminar);
+  if (boton.classList.contains('confirmando')) return true;
+  document.querySelectorAll('.boton-eliminar.confirmando').forEach((b) => b.classList.remove('confirmando'));
+  boton.classList.add('confirmando');
+  temporizadorEliminar = setTimeout(() => boton.classList.remove('confirmando'), 4000);
+  return false;
+}
+
+// Segundo clic: elimina el proyecto, la simulación, el reporte o al ingeniero, o sale del proyecto,
+// según el tipo guardado en data-eliminar.
+async function eliminarRegistro(boton) {
+  const tipo = boton.dataset.eliminar;
+  const id = Number(boton.dataset.id);
+  boton.disabled = true;
+
+  if (tipo === 'proyecto') {
+    const resultado = await eliminarProyecto(id);
+    if (!resultado.ok) {
+      mostrarMensaje('msg-historial', 'error', resultado.error);
+      boton.disabled = false;
+      return;
+    }
+    // Si se eliminó el proyecto abierto, el mapa queda libre; si no, solo se actualiza el historial.
+    if (estado.proyecto && estado.proyecto.id === id) cerrarProyecto();
+    else await cargarHistorial();
+    snackbar(resultado.mensaje);
+    return;
+  }
+
+  if (tipo === 'miembro' || tipo === 'salir') {
+    const resultado = await quitarIngeniero(estado.proyecto.id, id);
+    if (!resultado.ok) {
+      mostrarMensaje('msg-equipo', 'error', resultado.error);
+      boton.disabled = false;
+      return;
+    }
+    // Quien sale del proyecto deja de verlo; al quitar a otro ingeniero solo se actualiza el equipo.
+    if (tipo === 'salir') cerrarProyecto();
+    else await aplicarResultado(resultado, 'msg-equipo');
+    snackbar(resultado.mensaje);
+    return;
+  }
+
+  const resultado = tipo === 'simulacion'
+    ? await eliminarSimulacion(estado.proyecto.id, id)
+    : await eliminarReporte(estado.proyecto.id, id);
+  if (await aplicarResultado(resultado, tipo === 'simulacion' ? 'msg-mitigacion' : 'msg-reporte')) {
+    snackbar(resultado.mensaje);
+  }
+}
+
+// Muestra el error de una operación o carga sus datos y redibuja.
+async function aplicarResultado(resultado, idMensaje) {
+  if (!resultado.ok) {
+    mostrarMensaje(idMensaje, 'error', resultado.error);
+    return false;
+  }
+  limpiarMensajes();
+  cargarDatosProyecto(resultado);
+  await cargarHistorial();
+  return true;
+}
+
+// Deja el mapa libre para registrar un proyecto nuevo.
+function cerrarProyecto() {
+  estado.proyecto = null;
+  estado.simulaciones = [];
+  estado.simulacionVigente = null;
+  estado.punto = null;
+  limpiarObra(false);
+  document.body.classList.remove('hay-proyecto');
+  limpiarMensajes();
+  pintarUbicacionNueva();
+  mostrarPestana('proyectos');
+  pintarMapa();
+  cargarHistorial();
+}
+
+// Los eventos se registran una sola vez al cargar la página y al final se revisa la sesión; sin sesión se regresa al inicio de sesión.
+// ---------- Punto del proyecto ----------
+
+// Muestra la alcaldía y coordenadas del punto elegido para el proyecto nuevo.
+function pintarUbicacionNueva() {
+  const caja = $('ubicacion-texto');
+  const p = estado.punto;
+  caja.classList.toggle('lista', Boolean(p));
+  caja.querySelector('span').textContent = p
+    ? `${p.latitud.toFixed(6)}, ${p.longitud.toFixed(6)} · ${p.alcaldia}`
+    : 'Haga clic en el mapa para colocar el punto del proyecto.';
+}
+
+// Punto del proyecto por registrar (clic o arrastre sin proyecto activo).
+function colocarPuntoNuevo(latitud, longitud, nombreAlcaldia) {
+  if (!nombreAlcaldia) {
+    mostrarMensaje('msg-proyecto', 'error', MENSAJES.ubicacionFuera);
+    pintarMapa();
+    return;
+  }
+  $('msg-proyecto').innerHTML = '';
+  estado.punto = { latitud, longitud, alcaldia: nombreAlcaldia };
+  $('alcaldia').value = idAlcaldiaPorNombre(nombreAlcaldia);
+  pintarUbicacionNueva();
+  pintarMapa();
+}
+
+// Mueve el proyecto activo (clic o arrastre en la pestaña Proyectos).
+async function moverProyectoA(latitud, longitud) {
+  const resultado = await moverProyecto(estado.proyecto.id, latitud, longitud);
+  if (!resultado.ok) {
+    mostrarMensaje('msg-ubicacion', 'error', resultado.error);
+    pintarMapa();
+    return;
+  }
+  if (await aplicarResultado(resultado, 'msg-ubicacion')) {
+    mostrarMensaje('msg-ubicacion', 'exito', resultado.mensaje);
+  }
+}
+
+// ---------- Obra de mitigación ----------
+
+// Muestra la distancia y eficiencia del punto elegido para la obra.
+function pintarObraElegida() {
+  const caja = $('obra-ubicacion');
+  const o = estado.obra;
+  caja.classList.toggle('lista', Boolean(o));
+  caja.querySelector('span').textContent = o
+    ? `A ${numero(o.distancia, 1)} m del proyecto · eficiencia ${Math.round(o.eficiencia * 100)} %`
+    : 'Haga clic en el mapa dentro del círculo de la zona afectada.';
+}
+
+// Olvida la obra en preparación y, si se pide, vuelve a simular ar la pantalla.
+function limpiarObra(redibujar = true) {
+  estado.obra = null;
+  pintarObraElegida();
+  $('vista-previa').innerHTML = '';
+  if (redibujar && estado.proyecto) pintarTodo();
+}
+
+// Coloca la obra dentro de la zona afectada sin obra.
+function colocarObra(latitud, longitud) {
+  const p = estado.proyecto;
+  const modelo = modeloSimulacion();
+  if (!p || !modelo.antes) {
+    mostrarMensaje('msg-mitigacion', 'error', MENSAJES.caudalFaltante);
+    return;
+  }
+  const distancia = redondear(distanciaMetros(p.latitud, p.longitud, latitud, longitud), 2);
+  const eficiencia = eficienciaPorUbicacion(distancia, modelo.antes.radio);
+  if (eficiencia === null) {
+    mostrarMensaje('msg-mitigacion', 'error', MENSAJES.obraFueraDeZona);
+    return;
+  }
+  $('msg-mitigacion').innerHTML = '';
+  estado.obra = { latitud, longitud, distancia, eficiencia };
+  pintarObraElegida();
+  pintarTodo();
+}
+
+// ---------- Eventos del mapa ----------
+
+// Clic en el mapa: en la pestaña Mitigación coloca la obra; en las demás coloca o mueve el proyecto.
+function alHacerClicEnMapa(latitud, longitud, nombreAlcaldia) {
+  if (estado.pestana === 'proyectos') {
+    if (estado.proyecto) moverProyectoA(latitud, longitud);
+    else colocarPuntoNuevo(latitud, longitud, nombreAlcaldia);
+  } else if (estado.pestana === 'mitigacion' && estado.proyecto) {
+    colocarObra(latitud, longitud);
+  }
+}
+
+// Al soltar el pin arrastrado: mueve el proyecto activo o ajusta el punto del proyecto nuevo.
+function alArrastrarPin(latitud, longitud, nombreAlcaldia) {
+  if (estado.proyecto) moverProyectoA(latitud, longitud);
+  else colocarPuntoNuevo(latitud, longitud, nombreAlcaldia);
+}
+
+// ---------- RF-WEB-08: exportar reporte técnico ----------
+
+// RF-WEB-08: genera el PDF en el navegador, lo descarga y envía la copia al servidor.
+async function exportarReporte() {
+  mostrarPestana('reporte');
+  $('msg-reporte').innerHTML = '';
+
+  if (!datosCompletosParaReporte(estado.proyecto)) {
+    mostrarMensaje('msg-reporte', 'error', MENSAJES.reporteIncompleto);
+    return;
+  }
+  let reporte;
+  try {
+    reporte = generarReportePDF({
+      proyecto: estado.proyecto,
+      simulacion: estado.simulacionVigente,
+      coeficientes: estado.coeficientes,
+      usuario: estado.usuario
+    });
+  } catch (error) {
+    console.error(error);
+    mostrarMensaje('msg-reporte', 'error', MENSAJES.reporteFallido);
+    return;
+  }
+  if (reporte.tamanoBytes > TAMANO_MAXIMO_REPORTE) {
+    mostrarMensaje('msg-reporte', 'error', MENSAJES.reporteFallido);
+    return;
+  }
+  const resultado = await guardarReporte(estado.proyecto.id, reporte);
+  if (await aplicarResultado(resultado, 'msg-reporte')) {
+    reporte.documento.save(reporte.nombreArchivo);
+    mostrarMensaje('msg-reporte', 'exito', resultado.mensaje);
+  }
+}
+
+// ---------- Eventos de la interfaz ----------
+
+// Botones de las pestañas y enlaces que llevan a la pestaña Proyectos.
+document.querySelectorAll('.pestana').forEach((boton) => {
+  boton.addEventListener('click', () => mostrarPestana(boton.dataset.pestana));
+});
+document.querySelectorAll('.ir-proyectos').forEach((boton) => {
+  boton.addEventListener('click', () => mostrarPestana('proyectos'));
+});
+// Nuevo proyecto: cierra el proyecto activo y deja el formulario de registro listo.
+$('boton-nuevo-proyecto').addEventListener('click', cerrarProyecto);
+
+// Elegir la alcaldía en la lista coloca el punto en su centro.
+$('alcaldia').addEventListener('change', (evento) => {
+  const nombre = nombreAlcaldiaPorId(evento.target.value);
+  if (!nombre) {
+    estado.punto = null;
+    pintarUbicacionNueva();
+    pintarMapa();
+    return;
+  }
+  const centro = centroAlcaldia(nombre);
+  colocarPuntoNuevo(centro.latitud, centro.longitud, nombre);
+  centrarEn(centro.latitud, centro.longitud, 13);
+});
+
+// RF-WEB-02: registrar proyecto.
+$('form-proyecto').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const formulario = evento.target;
+  const punto = estado.punto || {};
+  const resultado = await registrarProyecto(
+    formulario.nombre.value, formulario.idAlcaldia.value, punto.latitud, punto.longitud
+  );
+  if (!resultado.ok) {
+    mostrarMensaje('msg-proyecto', 'error', resultado.error);
+    return;
+  }
+  formulario.reset();
+  estado.punto = null;
+  pintarUbicacionNueva();
+  estado.pagina = 1;
+  await aplicarResultado(resultado, 'msg-proyecto');
+  mostrarPestana('proyectos');
+  snackbar(resultado.mensaje);
+});
+
+// RF-WEB-03: abrir un proyecto del historial.
+$('lista-proyectos').addEventListener('click', async (evento) => {
+  const boton = evento.target.closest('.item-proyecto');
+  if (!boton) return;
+  estado.punto = null;
+  if (await aplicarResultado(await consultarProyecto(boton.dataset.id), 'msg-historial')) {
+    mostrarPestana(estado.pestana);
+  }
+});
+
+// Botones de eliminar del historial de proyectos, de la tabla de simulaciones y del historial de reportes.
+document.addEventListener('click', (evento) => {
+  const boton = evento.target.closest('[data-eliminar]');
+  if (boton && confirmarEliminacion(boton)) eliminarRegistro(boton);
+});
+
+// Paginación del historial.
+$('pagina-anterior').addEventListener('click', () => cargarHistorial(estado.pagina - 1));
+$('pagina-siguiente').addEventListener('click', () => cargarHistorial(estado.pagina + 1));
+
+// RF-WEB-04: coeficiente de escurrimiento.
+$('form-coeficiente').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const resultado = await calcularCoeficienteProyecto(estado.proyecto.id, $('ap').value, $('ai').value);
+  if (await aplicarResultado(resultado, 'msg-coeficiente')) {
+    mostrarMensaje('msg-coeficiente', 'exito', resultado.mensaje);
+  }
+});
+
+// RF-WEB-05: intensidad de lluvia.
+$('form-intensidad').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const resultado = await consultarIntensidadProyecto(estado.proyecto.id, $('periodo').value);
+  if (await aplicarResultado(resultado, 'msg-intensidad')) {
+    mostrarMensaje('msg-intensidad', 'exito', resultado.mensaje);
+  }
+});
+
+// RF-WEB-06: caudal pico.
+$('form-caudal').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const resultado = await calcularCaudalProyecto(estado.proyecto.id);
+  if (await aplicarResultado(resultado, 'msg-caudal')) {
+    mostrarMensaje('msg-caudal', 'exito', resultado.mensaje);
+  }
+});
+
+// Vista previa del coeficiente mientras se escriben las superficies.
+['ap', 'ai'].forEach((id) => $(id).addEventListener('input', pintarVistaCoeficiente));
+
+// Elegir un período en la gráfica o en la lista.
+$('grafica-intensidad').addEventListener('click', (evento) => {
+  const barra = evento.target.closest('.barra-periodo');
+  if (!barra) return;
+  $('periodo').value = barra.dataset.periodo;
+  pintarGraficaIntensidad(estado.proyecto);
+});
+$('periodo').addEventListener('change', () => { if (estado.proyecto) pintarGraficaIntensidad(estado.proyecto); });
+
+// Barra de avance: lleva a la tarjeta del paso.
+$('progreso-calculo').addEventListener('click', (evento) => {
+  const boton = evento.target.closest('[data-destino]');
+  if (boton) $(boton.dataset.destino).scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+// Botón "Usar": copia la capacidad recomendada al formulario.
+$('recomendacion-mitigacion').addEventListener('click', (evento) => {
+  const boton = evento.target.closest('.usar-capacidad');
+  if (!boton) return;
+  $('capacidad').value = boton.dataset.capacidad;
+  pintarTodo();
+  $('capacidad').focus();
+});
+
+// Vista previa de la obra mientras se eligen tipo y capacidad.
+$('tipo-obra').addEventListener('change', () => { if (estado.proyecto) pintarTodo(); });
+$('capacidad').addEventListener('input', () => { if (estado.proyecto) pintarTodo(); });
+
+//Copiar su valor al campo de capacidad y actualiza la vista previa y el mapa.
+$('barra-capacidad').addEventListener('input', () => {
+  $('capacidad').value = Number($('barra-capacidad').value).toFixed(2);
+  if (estado.proyecto) pintarTodo();
+});
+
+// Invitar a un ingeniero al proyecto activo.
+$('form-invitar').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const resultado = await invitarIngeniero(estado.proyecto.id, $('correo-invitado').value);
+  if (await aplicarResultado(resultado, 'msg-equipo')) {
+    $('correo-invitado').value = '';
+    mostrarMensaje('msg-equipo', 'exito', resultado.mensaje);
+  }
+});
+
+// RF-WEB-07: simulación de mitigación.
+$('form-mitigacion').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const obra = estado.obra || {};
+  const resultado = await simularMitigacionProyecto(
+    estado.proyecto.id, $('tipo-obra').value, $('capacidad').value, obra.latitud, obra.longitud
+  );
+  if (!resultado.ok) {
+    mostrarMensaje('msg-mitigacion', 'error', resultado.error);
+    return;
+  }
+  estado.obra = null;
+  pintarObraElegida();
+  await aplicarResultado(resultado, 'msg-mitigacion');
+  const s = resultado.simulacion;
+  const semaforo = evaluarSemaforo(s.caudalAjustado, s.caudalPermitido);
+  const texto = `${s.tipoObra} (eficiencia ${Math.round(s.eficiencia * 100)} %): caudal ajustado `
+    + `${numero(s.caudalAjustado, 3)} m³/s. ${resultado.mensaje}. Semáforo: ${semaforo.etiqueta}.`;
+  mostrarMensaje('msg-mitigacion', s.dentroDeCapacidad ? 'exito' : 'error', texto);
+});
+
+// RF-WEB-08: botones de exportación.
+$('boton-exportar-barra').addEventListener('click', exportarReporte);
+$('boton-exportar').addEventListener('click', exportarReporte);
+$('accion-mitigar').addEventListener('click', (evento) => {
+  if (evento.target.closest('#ir-mitigacion')) mostrarPestana('mitigacion');
+});
+
+// RF-WEB-17: cerrar sesión.
+$('boton-salir').addEventListener('click', async () => {
+  await cerrarSesion();
+  window.location.href = 'index.html';
+});
+
+// ---------- Inicio ----------
+
+async function iniciarPanel() {
+  estado.usuario = await usuarioActivo();
+  if (!estado.usuario) {
+    window.location.href = 'index.html';
+    return;
+  }
+  if (estado.usuario.debeCambiarContrasena) {
+    window.location.href = 'contrasena.html';
+    return;
+  }
+  $('nombre-usuario').textContent = estado.usuario.nombre;
+
+  estado.alcaldias = await obtenerAlcaldias();
+  const select = $('alcaldia');
+  estado.alcaldias.forEach((a) => {
+    const opcion = document.createElement('option');
+    opcion.value = a.id;
+    opcion.textContent = a.nombre;
+    select.appendChild(opcion);
+  });
+
+  estado.coeficientes = await obtenerCoeficientes();
+  iniciarMapa('mapa', { alHacerClic: alHacerClicEnMapa, alArrastrarPin });
+  mostrarPestana('proyectos');
+  await cargarHistorial(1);
+}
+
+iniciarPanel();
