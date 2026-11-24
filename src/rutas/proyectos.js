@@ -1,4 +1,4 @@
-// Administra proyectos, simulaciones y reportes.
+// Administra proyectos, obras y reportes.
 const express = require('express');
 const db = require('../db');
 const { requiereSesion } = require('./auth');
@@ -19,14 +19,14 @@ const PROYECTOS_POR_DIA = 100;
 const BYTES_REPORTES_POR_DIA = 25 * 1024 * 1024;   
 
 
-// Atiende una accion o consulta de este modulo.
+// Aplica esta comprobación antes de continuar.
 router.use(requiereSesion);
 
 
 
 
 
-// Realiza una tarea importante de este modulo.
+// Convierte una fila de proyecto para la pagina.
 function aProyecto(f, idUsuario) {
   return {
     id: f.id_proyecto,
@@ -51,7 +51,7 @@ function aProyecto(f, idUsuario) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Convierte una fila de simulacion para la pagina.
 function aSimulacion(f) {
   return {
     id: f.id_simulacion,
@@ -79,7 +79,7 @@ const COLUMNAS_REPORTE = `r.id_reporte, r.id_proyecto, r.fecha_generacion,
 
 
 
-// Realiza una tarea importante de este modulo.
+// Prepara los datos visibles de un reporte.
 function aReporte(f) {
   return {
     id: f.id_reporte,
@@ -94,7 +94,7 @@ function aReporte(f) {
 
 
 
-// Realiza una tarea importante de este modulo.
+// Busca un proyecto al que el usuario tiene acceso.
 async function buscarProyecto(idTexto, idUsuario, coeficientes) {
   if (!calc.identificadorValido(idTexto)) return null;
   const { rows: filas } = await db.query(
@@ -105,20 +105,20 @@ async function buscarProyecto(idTexto, idUsuario, coeficientes) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Forma el aviso cuando cambia el caudal.
 function textoRecalculo(caudal) {
   return caudal != null ? ` · Caudal pico recalculado: ${caudal.toFixed(3)} m³/s` : '';
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Calcula resultados con datos temporales.
 function resultadosCon(fila, cambios, coeficientes) {
   return completarProyecto({ ...fila, ...cambios }, coeficientes);
 }
 
 
 
-// Realiza una tarea importante de este modulo.
+// Carga el proyecto indicado por la ruta.
 async function cargarProyecto(req, res, next) {
   req.coeficientes = await coeficientesNormativos();
   const fila = await buscarProyecto(req.params.id, req.session.usuario.id, req.coeficientes);
@@ -130,7 +130,7 @@ async function cargarProyecto(req, res, next) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Permite continuar solo al creador del proyecto.
 function soloCreador(req, res, next) {
   if (req.fila.id_usuario !== req.session.usuario.id) {
     return res.status(403).json({ error: calc.MENSAJES.soloCreador });
@@ -139,7 +139,7 @@ function soloCreador(req, res, next) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Obtiene al creador y los invitados.
 async function miembrosDelProyecto(fila) {
   const { rows: invitados } = await db.query(
     `SELECT u.id_usuario AS id, u.nombre, u.correo
@@ -155,7 +155,7 @@ async function miembrosDelProyecto(fila) {
 }
 
 
-// Realiza una tarea importante de este modulo.
+// Arma la respuesta completa del proyecto.
 async function responderProyecto(res, idProyecto, idUsuario, mensaje = '') {
   const coeficientes = await coeficientesNormativos();
   const fila = await buscarProyecto(idProyecto, idUsuario, coeficientes);
@@ -184,20 +184,20 @@ async function responderProyecto(res, idProyecto, idUsuario, mensaje = '') {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Entrega el catálogo de alcaldias.
 router.get('/alcaldias', async (req, res) => {
   const { rows: filas } = await db.query('SELECT id_alcaldia AS id, nombre FROM alcaldia ORDER BY nombre');
   res.json({ alcaldias: filas });
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Entrega los coeficientes vigentes.
 router.get('/coeficientes', async (req, res) => {
   res.json({ coeficientes: await coeficientesNormativos() });
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta las intensidades de una alcaldia.
 router.get('/alcaldias/:id/intensidades', async (req, res) => {
   if (!calc.identificadorValido(req.params.id)) {
     return res.status(400).json({ error: calc.MENSAJES.periodoInvalido });
@@ -212,7 +212,7 @@ router.get('/alcaldias/:id/intensidades', async (req, res) => {
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o registra proyectos.
 router.get('/proyectos', async (req, res) => {
   const idUsuario = req.session.usuario.id;
 
@@ -248,7 +248,7 @@ router.get('/proyectos', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o registra proyectos.
 router.post('/proyectos', async (req, res) => {
   const datos = req.body || {};
   
@@ -303,14 +303,14 @@ router.post('/proyectos', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o elimina un proyecto.
 router.get('/proyectos/:id', cargarProyecto, async (req, res) => {
   await responderProyecto(res, req.fila.id_proyecto, req.session.usuario.id);
 });
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Calcula el coeficiente de escurrimiento.
 router.post('/proyectos/:id/coeficiente', cargarProyecto, async (req, res) => {
   const datos = req.body || {};
   const superficies = calc.validarSuperficies(datos.superficiePermeable, datos.superficieImpermeable);
@@ -336,7 +336,7 @@ router.post('/proyectos/:id/coeficiente', cargarProyecto, async (req, res) => {
 });
 
 
-// Realiza una tarea importante de este modulo.
+// Busca la intensidad de una alcaldia.
 async function intensidadNormativa(idAlcaldia, periodo) {
   const { rows: filas } = await db.query(
     'SELECT intensidad_mm_h FROM intensidad_lluvia WHERE id_alcaldia = $1 AND periodo_retorno = $2',
@@ -347,7 +347,7 @@ async function intensidadNormativa(idAlcaldia, periodo) {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Guarda el período de retorno.
 router.post('/proyectos/:id/intensidad', cargarProyecto, async (req, res) => {
   const periodo = Number((req.body || {}).periodoRetorno);
   const p = req.fila;
@@ -369,7 +369,7 @@ router.post('/proyectos/:id/intensidad', cargarProyecto, async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Actualiza la ubicación del proyecto.
 router.post('/proyectos/:id/ubicacion', cargarProyecto, async (req, res) => {
   const datos = req.body || {};
   const p = req.fila;
@@ -409,7 +409,7 @@ router.post('/proyectos/:id/ubicacion', cargarProyecto, async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Calcula el caudal pico.
 router.post('/proyectos/:id/caudal', cargarProyecto, async (req, res) => {
   const p = req.fila;
   const error = calc.validarParametrosCaudal(p.coeficiente_c, p.intensidad_mm_h, p.superficie_total);
@@ -424,7 +424,7 @@ router.post('/proyectos/:id/caudal', cargarProyecto, async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Guarda una obra de mitigacion.
 router.post('/proyectos/:id/mitigacion', cargarProyecto, async (req, res) => {
   const datos = req.body || {};
   const p = req.fila;
@@ -474,7 +474,7 @@ router.post('/proyectos/:id/mitigacion', cargarProyecto, async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Crea o consulta reportes.
 router.post('/proyectos/:id/reportes', cargarProyecto, async (req, res) => {
   const datos = req.body || {};
   const idUsuario = req.session.usuario.id;
@@ -518,7 +518,7 @@ router.post('/proyectos/:id/reportes', cargarProyecto, async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Consulta o elimina un proyecto.
 router.delete('/proyectos/:id', cargarProyecto, soloCreador, async (req, res) => {
   await db.query(
     `WITH reportes AS (DELETE FROM reporte_pdf WHERE id_proyecto = $1),
@@ -530,7 +530,7 @@ router.delete('/proyectos/:id', cargarProyecto, soloCreador, async (req, res) =>
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Elimina una simulacion.
 router.delete('/proyectos/:id/simulaciones/:idSimulacion', cargarProyecto, async (req, res) => {
   const p = req.fila;
   const idSimulacion = req.params.idSimulacion;
@@ -544,7 +544,7 @@ router.delete('/proyectos/:id/simulaciones/:idSimulacion', cargarProyecto, async
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Elimina un reporte.
 router.delete('/proyectos/:id/reportes/:idReporte', cargarProyecto, async (req, res) => {
   const p = req.fila;
   const idReporte = req.params.idReporte;
@@ -558,7 +558,7 @@ router.delete('/proyectos/:id/reportes/:idReporte', cargarProyecto, async (req, 
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Descarga el archivo PDF.
 router.get('/reportes/:id/descargar', async (req, res) => {
   if (!calc.identificadorValido(req.params.id)) {
     return res.status(404).json({ error: calc.MENSAJES.proyectoNoEncontrado });
@@ -582,7 +582,7 @@ router.get('/reportes/:id/descargar', async (req, res) => {
 
 
 
-// Atiende una accion o consulta de este modulo.
+// Agrega un ingeniero al proyecto.
 router.post('/proyectos/:id/miembros', cargarProyecto, soloCreador, async (req, res) => {
   const correo = String((req.body || {}).correo ?? '').trim();
   if (!calc.correoValido(correo)) return res.status(400).json({ error: calc.MENSAJES.correoInvalido });
@@ -618,7 +618,7 @@ router.post('/proyectos/:id/miembros', cargarProyecto, soloCreador, async (req, 
 });
 
 
-// Atiende una accion o consulta de este modulo.
+// Retira un ingeniero del proyecto.
 router.delete('/proyectos/:id/miembros/:idUsuario', cargarProyecto, async (req, res) => {
   const p = req.fila;
   const idSesion = req.session.usuario.id;
